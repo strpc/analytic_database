@@ -112,14 +112,20 @@ class Receipts():
     receipts_timestamp = ''
     device_id = int()
     suitcases = list()
+    quantitypackageone = ''
+    quantitypackagedouble = ''
     
-    def __init__(self, receipts_id, 
-                       receipts_timestamp, 
-                       device_id):
+    def __init__(self, receipts_id,
+                       receipts_timestamp,
+                       device_id,
+                       quantitypackageone,
+                       quantitypackagedouble):
         self.receipts_id = receipts_id
         self.receipts_timestamp = receipts_timestamp
         self.device_id = device_id
         self.suitcases = list()
+        self.quantitypackageone = quantitypackageone
+        self.quantitypackagedouble = quantitypackagedouble
         
     def __str__(self):
         return f'{self.receipts_id}, {len(self.suitcases)}'
@@ -135,15 +141,18 @@ class Suitcase():
     suitcase_finish = ''
     suitcase_issue = list()
     suitcase_alarm = list()
+    package_type = ''
     
     def __init__(self, suitcase_id, 
                        suitcase_start, 
-                       suitcase_finish):
+                       suitcase_finish,
+                       package_type):
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.suitcase_issue = list()
         self.suitcase_alarm = list()
+        self.package_type = package_type
 
 
     def __str__(self):
@@ -257,7 +266,7 @@ class Get_request():
 
         #TODO: old: dateopen
         rows = await conn.fetch(f"\
-        SELECT DISTINCT receipts.receipt_id, dateclose, device_id\
+        SELECT DISTINCT receipts.receipt_id, dateclose, device_id, receipts.quantitypackageone, receipts.quantitypackagedouble \
         FROM receipts \
         LEFT JOIN polycomm_suitcase on \
             receipts.receipt_id = polycomm_suitcase.receipt_id \
@@ -273,9 +282,12 @@ class Get_request():
         
         receipts_list = list()
         for row in rows:
-            receipts_list.append(Receipts(receipts_id=row['receipt_id'], 
-                                          receipts_timestamp=row['dateclose'], 
-                                          device_id=row['device_id'])
+            receipts_list.append(Receipts(receipts_id=row['receipt_id'],
+                                          receipts_timestamp=row['dateclose'],
+                                          device_id=row['device_id'],
+                                          quantitypackageone=row['quantitypackageone'],
+                                          quantitypackagedouble=row['quantitypackagedouble']
+                                          )
                                   ) 
         return receipts_list.copy()
     
@@ -285,7 +297,7 @@ class Get_request():
         conn = await self.connect()
         
         rows = await conn.fetch(f"\
-        SELECT id, dateini_local, local_date \
+        SELECT id, dateini_local, local_date, package_type \
         FROM polycomm_suitcase \
         WHERE \
         dateini_local > timestamp '{self.date_start}' and \
@@ -299,7 +311,8 @@ class Get_request():
         for row in rows:
             suitcases_list.append(Suitcase(suitcase_id=row['id'], 
                                            suitcase_start=row['dateini_local'], 
-                                           suitcase_finish=row['local_date'])
+                                           suitcase_finish=row['local_date'],
+                                           package_type=row['package_type'])
                                   )
             
         return suitcases_list.copy()
@@ -352,13 +365,17 @@ async def run_app(request: Get_request):
         device.line_event.sort(key=lambda d: d['time'])
 
         # for i in device.line_event:
-            # if i['type'] == 'suitcase_start':
-            #     print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
-            # elif i['type'] == 'suitcase_finish':
-            #    print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
-            # else:
-            #     print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
-    #     with open('suites.csv')
+        #     if i['type'] == 'suitcase_start':
+        #         print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ - type: {i['object'].package_type}")
+        #     elif i['type'] == 'suitcase_finish':
+        #        print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
+        #     elif i['type'] == 'receipt' and i['object'].quantitypackageone == 1:
+        #         print(f"{device.name} - {i['time']} - {i['type']} - quantitypackageone: {i['object'].quantitypackageone}")
+        #     elif i['type'] == 'receipt' and i['object'].quantitypackagedouble == 1:
+        #         print(f"{device.name} - {i['time']} - {i['type']} - quantitypackagedouble: {i['object'].quantitypackagedouble}")
+        #     else:
+        #         print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
+    
         with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
             writer = csv.writer(file, delimiter=";")
             for i in device.line_event:
@@ -366,6 +383,10 @@ async def run_app(request: Get_request):
                     writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
+                elif i['type'] == 'receipt' and i['object'].quantitypackageone == 1:
+                    writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
+                elif i['type'] == 'receipt' and i['object'].quantitypackagedouble == 1:
+                    writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
                 else:
                     writer.writerow((device.name, i['time'], i['type']))
                         
