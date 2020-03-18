@@ -1,7 +1,9 @@
 import asyncio
 import asyncpg
 
+import csv
 import logging
+from datetime import datetime
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -13,6 +15,7 @@ PG_USER = 'postgres'
 PG_PASSWORD = '1'
 PG_HOST = 'localhost'
 PG_DB = 'control_db'
+DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 DATE_START = '2020-01-01'
 DATE_FINISH = '2020-01-02'
 
@@ -23,19 +26,24 @@ class Alarm():
     alarm_time = ''
     alarm_id = int()
     alarm_device_id = int()
+    alarm_type = ''
     
     def __init__(self, alarm_id, 
                        alarm_time,
-                       alarm_device_id):
+                       alarm_device_id,
+                       alarm_type):
         self.alarm_id = alarm_id
         self.alarm_time = alarm_time
         self.alarm_device_id = alarm_device_id
+        self.alarm_type = alarm_type
         
     def __str__(self):
-        return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
+        return f'{self.alarm_type}'
+        # return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
     
     def __repr__(self):
-        return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
+        return f'{self.alarm_type}'
+        # return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
 
 
 class Device():
@@ -46,6 +54,7 @@ class Device():
     issue_list = list() # ОПОВЕЩЕНИЯ
     receipts_list = list() # ЧЕКИ
     suitcases_list = list() # УПАКОВКИ
+    line_event = list()
     
     def __init__(self, device_id, 
                        name):
@@ -55,6 +64,15 @@ class Device():
         self.issue_list = list()
         self.receipts_list = list()
         self.suitcases_list = list()
+        self.line_event = list()
+        # self.line_event = {
+        #     'alarm_list': [],
+        #     'issue_list': [],
+        #     'receipts_list': [],
+        #     'suitcases_list': [],
+        #     'unlinked_issue_list': [],
+        #     'unlinked_alarm_list': []
+        # }
             
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -68,19 +86,24 @@ class Issue():
     suitcase_id = int()
     issue_time = ''
     issue_device_id = int()
+    issue_type = ''
 
     def __init__(self, suitcase_id, 
                        issue_time, 
-                       device_id):
+                       device_id,
+                       issue_type):
         self.suitcase_id = suitcase_id
         self.issue_time = issue_time
         self.device_id = device_id
+        self.issue_type = issue_type
     
     def __str__(self):
-        return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
+        return f'{self.issue_type}'
+        # return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
     
     def __repr__(self):
-        return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
+        return f'{self.issue_type}'
+        # return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
         
     
 class Receipts():
@@ -180,8 +203,10 @@ class Get_request():
 
         alarm_list = list()
         rows = await conn.fetch(f"\
-            SELECT id, localdate, device \
+            SELECT polycommalarm.id, localdate, device, polycomm_alarm_type.title \
             FROM polycommalarm \
+            INNER JOIN polycomm_alarm_type ON \
+                polycomm_alarm_type.id = polycommalarm.alarmtype \
             WHERE localdate > timestamp '{self.date_start}' \
                 and localdate < timestamp '{self.date_finish}' \
                 and device = {device_id} \
@@ -192,7 +217,8 @@ class Get_request():
         for row in rows:
             alarm_list.append(Alarm(alarm_id=row['id'],
                                     alarm_time=row['localdate'],
-                                    alarm_device_id=row['device']
+                                    alarm_device_id=row['device'],
+                                    alarm_type=row['title']
                                     ))
         # print(*alarm_list)
         return alarm_list.copy()
@@ -203,8 +229,10 @@ class Get_request():
         conn = await self.connect()
         
         rows = await conn.fetch(f"\
-            SELECT suitcase, localdate, device \
+            SELECT suitcase, localdate, device, polycomm_issue_type.title \
             FROM polycommissue \
+            INNER JOIN polycomm_issue_type ON \
+                polycommissue.type = polycomm_issue_type.id \
             WHERE localdate > timestamp '{self.date_start}' \
                 and localdate < timestamp '{self.date_finish}' \
                 and device = {device_id} \
@@ -216,7 +244,8 @@ class Get_request():
         for row in rows:
             issue_list.append(Issue(suitcase_id=row['suitcase'],
                                     issue_time=row['localdate'],
-                                    device_id=row['device']))
+                                    device_id=row['device'],
+                                    issue_type=row['title']))
         return issue_list.copy()
     
     
@@ -279,41 +308,102 @@ class Get_request():
 async def run_app(request: Get_request):
     devices = await request.get_devices()
     
-    list_dict = list()
-    
     for device in devices:
         device.alarm_list = await request.get_alarm(device.device_id)
         device.issue_list = await request.get_issue(device.device_id)
         device.receipts_list = await request.get_receipts(device.device_id)
         device.suitcases_list = await request.get_suitcases(device.device_id)
         
-        issue_unlinked = list()
-        alarm_unlinked = list()
-        
-        print(device.name)
+        for alarm in device.alarm_list:
+            device.line_event.append(
+                    {'time': alarm.alarm_time,
+                     'object': alarm,
+                     'type':'alarm'
+                    }
+                )
         for issue in device.issue_list:
-            for suitcase in device.suitcases_list:
-                if issue.issue_time > suitcase.suitcase_start and issue.issue_time < suitcase.suitcase_finish and len(device.issue_list) > 0:
-                    print('done')
-                    suitcase.suitcase_issue.append(device.issue_list.pop(0))
-                    # print(f'ОПОВЕЩЕНИЕ {issue.issue_time} живет внутри упаковки {suitcase.suitcase_start} - {suitcase.suitcase_finish} device_id = {device.device_id}')
+            device.line_event.append(
+                    {'time': issue.issue_time,
+                     'object': issue,
+                     'type':'issue'
+                    }
+                )
+        for receipt in device.receipts_list:
+            device.line_event.append(
+                    {'time': receipt.receipts_timestamp,
+                     'object': receipt,
+                     'type':'receipt'
+                    }
+                )
+        for suitcase in device.suitcases_list:
+            device.line_event.append(
+                    {'time': suitcase.suitcase_start,
+                     'object': suitcase,
+                     'type': 'suitcase_start'
+                    }
+                )
+            device.line_event.append(
+                    {'time': suitcase.suitcase_finish,
+                     'object': suitcase,
+                     'type': 'suitcase_finish'
+                    }
+                )
+            
+        device.line_event.sort(key=lambda d: d['time'])
+
+        # for i in device.line_event:
+            # if i['type'] == 'suitcase_start':
+            #     print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
+            # elif i['type'] == 'suitcase_finish':
+            #    print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
+            # else:
+            #     print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
+    #     with open('suites.csv')
+        with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
+            writer = csv.writer(file, delimiter=";")
+            for i in device.line_event:
+                if i['type'] == 'suitcase_start':
+                    writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
+                elif i['type'] == 'suitcase_finish':
+                    writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
                 else:
-                    # print(f'{device.name} - ОПОВЕЩЕНИЕ {issue.issue_time} НЕ живет внутри упаковки {suitcase.suitcase_start} - {suitcase.suitcase_finish}')
-                    if len(device.issue_list) > 0:
-                        issue_unlinked.append(device.issue_list.pop(0))
+                    writer.writerow((device.name, i['time'], i['type']))
                         
-                for alarm in device.alarm_list:
-                    if alarm.alarm_time > suitcase.suitcase_start and alarm.alarm_time < suitcase.suitcase_finish and len(device.alarm_list) > 0:
-                        print('done')
-                        print(alarm)
-                        suitcase.suitcase_alarm.append(device.alarm_list.pop(0))
-                    else:
-                        if len(device.alarm_list) > 0:
-                            alarm_unlinked.append(device.alarm_list.pop(0))
-                
-                for receipt in device.receipts_list:
-                    list_dict.append(suitcase.)
+        # print(device.name)
+        # for issue in device.issue_list:
+        #     for suitcase in device.suitcases_list:
+        #         if issue.issue_time > suitcase.suitcase_start and issue.issue_time < suitcase.suitcase_finish and len(device.issue_list) > 0:
+        #             # print('done')
+        #             device.line_event.append(f'{issue.issue_time} - issue')
+        #             device.issue_list.pop(0)
+        #             # print(device.line_event[0])
                     
+        #             # suitcase.suitcase_issue.append(device.issue_list.pop(0))
+        #         else:
+        #             if len(device.issue_list) > 0:
+        #                 device.line_event['unlinked_issue_li st'].append(device.issue_list.pop(0))
+        #                 # issue_unlinked.append(device.issue_list.pop(0))
+                        
+        #         for alarm in device.alarm_list:
+        #             if alarm.alarm_time > suitcase.suitcase_start and alarm.alarm_time < suitcase.suitcase_finish and len(device.alarm_list) > 0:
+        #                 # device.line_event['alarm_list'].append(device.alarm_list.pop(0))
+        #                 # print('done')
+        #                 pass
+        #                 # print(alarm)
+        #                 # suitcase.suitcase_alarm.append(device.alarm_list.pop(0))
+        #             else:
+        #                 if len(device.alarm_list) > 0:
+        #                     # device.line_event['unlinked_alarm_list'].append(device.alarm_list.pop(0))
+        #                     pass
+        #                     # alarm_unlinked.append(device.alarm_list.pop(0))
+                
+        #         for receipt in device.receipts_list:
+        #             pass
+                    # device.line_event['receipts_list'].append(device.receipts_list[0].receipts_timestamp)
+                    # device.receipts_list.pop(0)
+                                                              #.pop(0))
+        # for i in device.line_event['receipts_list']:
+        #     print(datetime.strftime(i, DATE_FORMAT)
                 
                 
         # for receipt in device.receipts_list: # NOTE: v1
