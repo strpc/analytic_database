@@ -65,17 +65,11 @@ class Device():
         self.receipts_list = list()
         self.suitcases_list = list()
         self.line_event = list()
-        # self.line_event = {
-        #     'alarm_list': [],
-        #     'issue_list': [],
-        #     'receipts_list': [],
-        #     'suitcases_list': [],
-        #     'unlinked_issue_list': [],
-        #     'unlinked_alarm_list': []
-        # }
-            
+    
+    
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
+    
     
     def __str__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -363,21 +357,56 @@ async def run_app(request: Get_request):
                 )
             
         device.line_event.sort(key=lambda d: d['time'])
-
+            
+            
         # for i in device.line_event:
         #     if i['type'] == 'suitcase_start':
-        #         print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ - type: {i['object'].package_type}")
+        #         print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
         #     elif i['type'] == 'suitcase_finish':
         #        print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
-        #     elif i['type'] == 'receipt' and i['object'].quantitypackageone == 1:
-        #         print(f"{device.name} - {i['time']} - {i['type']} - quantitypackageone: {i['object'].quantitypackageone}")
-        #     elif i['type'] == 'receipt' and i['object'].quantitypackagedouble == 1:
-        #         print(f"{device.name} - {i['time']} - {i['type']} - quantitypackagedouble: {i['object'].quantitypackagedouble}")
         #     else:
         #         print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
     
+        # for i in range(len(device.line_event)):
+        #     print(len(device.line_event))
+            # print(i[-1])
+        
+    # for j in range(len(device.line_event)):
+    #     if j != 0 and j != 1 and j != 2 and i['type'] == 'receipt' and i[j-1]['type'] == 'suitcase_start':
+    #         device.line_event.insert(j+1, device.line_event.pop(j))
+
+        # for i in range(len(device.line_event)):
+        #     if device.line_event[i]['type'] == 'receipt':
+        #         j = i
+        #         while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
+        #             j += 1
+        #         if j < len(device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
+        #             t = device.line_event.pop(i)
+        #             device.line_event.insert(j, t)
+        
+        last = None
+        for i in range(len(device.line_event)):
+            if device.line_event[i]['type'] in {'suitcase_start', 'suitcase_finish'}:
+                last = device.line_event[i]['type']
+            if device.line_event[i]['type'] == 'receipt':
+                if last == None:
+                    j = i
+                    while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
+                        j += 1
+                    if j < len(device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
+                        t = device.line_event.pop(i)
+                        device.line_event.insert(j, t)
+                if last == 'suitcase_start':
+                    j = i
+                    while j < len(device.line_event) and device.line_event[j]['type'] != 'suitcase_finish':
+                        j += 1
+                    if j < len(device.line_event):
+                        t = device.line_event.pop(i)
+                        device.line_event.insert(j, t)
+                    
         with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
             writer = csv.writer(file, delimiter=";")
+            
             for i in device.line_event:
                 if i['type'] == 'suitcase_start':
                     writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
@@ -391,59 +420,11 @@ async def run_app(request: Get_request):
                 
                 else:
                     writer.writerow((device.name, i['time'], i['type']))
-                        
-        # print(device.name)
-        # for issue in device.issue_list:
-        #     for suitcase in device.suitcases_list:
-        #         if issue.issue_time > suitcase.suitcase_start and issue.issue_time < suitcase.suitcase_finish and len(device.issue_list) > 0:
-        #             # print('done')
-        #             device.line_event.append(f'{issue.issue_time} - issue')
-        #             device.issue_list.pop(0)
-        #             # print(device.line_event[0])
-                    
-        #             # suitcase.suitcase_issue.append(device.issue_list.pop(0))
-        #         else:
-        #             if len(device.issue_list) > 0:
-        #                 device.line_event['unlinked_issue_li st'].append(device.issue_list.pop(0))
-        #                 # issue_unlinked.append(device.issue_list.pop(0))
-                        
-        #         for alarm in device.alarm_list:
-        #             if alarm.alarm_time > suitcase.suitcase_start and alarm.alarm_time < suitcase.suitcase_finish and len(device.alarm_list) > 0:
-        #                 # device.line_event['alarm_list'].append(device.alarm_list.pop(0))
-        #                 # print('done')
-        #                 pass
-        #                 # print(alarm)
-        #                 # suitcase.suitcase_alarm.append(device.alarm_list.pop(0))
-        #             else:
-        #                 if len(device.alarm_list) > 0:
-        #                     # device.line_event['unlinked_alarm_list'].append(device.alarm_list.pop(0))
-        #                     pass
-        #                     # alarm_unlinked.append(device.alarm_list.pop(0))
-                
-        #         for receipt in device.receipts_list:
-        #             pass
-                    # device.line_event['receipts_list'].append(device.receipts_list[0].receipts_timestamp)
-                    # device.receipts_list.pop(0)
-                                                              #.pop(0))
-        # for i in device.line_event['receipts_list']:
-        #     print(datetime.strftime(i, DATE_FORMAT)
-                
-                
-        # for receipt in device.receipts_list: # NOTE: v1
-            
-        #     # while len(device.suitcases_list) > 0 and receipt.receipts_timestamp > device.suitcases_list[0].suitcase_start:
-        #     #     try:
-        #     #         while len(device.issue_list) > 0 and device.issue_list[0].issue_time < device.suitcases_list[1].suitcase_start:
-        #     #             print(device.issue_list[0])
-        #     #             device.suitcases_list[0].suitcase_issue.append(device.issue_list.pop(0))
-        #     #     except IndexError:
-        #     #         device.suitcases_list[0].suitcase_issue.append(device.issue_list.pop(0))
-        #     #     receipt.suitcases.insert(0, device.suitcases_list.pop(0))
+               
     
         #     # for suitcase in device.suitcases_list:
         #     #     print(suitcase)
         #     #     print()
-
     # for device in devices:
     #     print(f'\t╠ НАЗВАНИЕ ДЕВАЙСА {device.name}')
     #     for receipt in device.receipts:
