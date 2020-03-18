@@ -383,10 +383,12 @@ async def run_app(request: Get_request):
                     writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
-                elif i['type'] == 'receipt' and i['object'].quantitypackageone == 1:
+                    
+                elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
                     writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
-                elif i['type'] == 'receipt' and i['object'].quantitypackagedouble == 1:
+                elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
                     writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
+                
                 else:
                     writer.writerow((device.name, i['time'], i['type']))
                         
