@@ -258,7 +258,7 @@ class Get_request():
         '''ПОЛУЧЕНИЕ ЧЕКОВ'''
         conn = await self.connect()
 
-        #TODO: old: dateopen
+        #WORKED: dateopen
         rows = await conn.fetch(f"\
         SELECT DISTINCT receipts.receipt_id, dateclose, device_id, receipts.quantitypackageone, receipts.quantitypackagedouble \
         FROM receipts \
@@ -359,30 +359,21 @@ async def run_app(request: Get_request):
         device.line_event.sort(key=lambda d: d['time'])
             
             
-        # for i in device.line_event:
-        #     if i['type'] == 'suitcase_start':
-        #         print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
-        #     elif i['type'] == 'suitcase_finish':
-        #        print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
-        #     else:
-        #         print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
-    
-        # for i in range(len(device.line_event)):
-        #     print(len(device.line_event))
-            # print(i[-1])
         
-    # for j in range(len(device.line_event)):
-    #     if j != 0 and j != 1 and j != 2 and i['type'] == 'receipt' and i[j-1]['type'] == 'suitcase_start':
-    #         device.line_event.insert(j+1, device.line_event.pop(j))
+        #NOTE: sort v1
+        # for j in range(len(device.line_event)):
+        #     if j != 0 and j != 1 and j != 2 and i['type'] == 'receipt' and i[j-1]['type'] == 'suitcase_start':
+        #         device.line_event.insert(j+1, device.line_event.pop(j))
 
-        # for i in range(len(device.line_event)):
-        #     if device.line_event[i]['type'] == 'receipt':
-        #         j = i
-        #         while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
-        #             j += 1
-        #         if j < len(device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
-        #             t = device.line_event.pop(i)
-        #             device.line_event.insert(j, t)
+        #     for i in range(len(device.line_event)):
+        #         if device.line_event[i]['type'] == 'receipt':
+        #             j = i
+        #             while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
+        #                 j += 1
+        #             if j < len(device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
+        #                 t = device.line_event.pop(i)
+        #                 device.line_event.insert(j, t)
+        
         
         last = None
         for i in range(len(device.line_event)):
@@ -393,7 +384,7 @@ async def run_app(request: Get_request):
                     j = i
                     while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
                         j += 1
-                    if j < len(device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
+                    if j < len (device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
                         t = device.line_event.pop(i)
                         device.line_event.insert(j, t)
                 if last == 'suitcase_start':
@@ -403,28 +394,37 @@ async def run_app(request: Get_request):
                     if j < len(device.line_event):
                         t = device.line_event.pop(i)
                         device.line_event.insert(j, t)
-                    
-        with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file, delimiter=";")
+        
+        
+        #NOTE: CSV
+        # with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
+        #     writer = csv.writer(file, delimiter=";")
             
-            for i in device.line_event:
-                if i['type'] == 'suitcase_start':
-                    writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
-                elif i['type'] == 'suitcase_finish':
-                    writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
+        #     for i in device.line_event:
+        #         if i['type'] == 'suitcase_start':
+        #             writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
+        #         elif i['type'] == 'suitcase_finish':
+        #             writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
                     
-                elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-                    writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
-                elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                    writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
+        #         elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
+        #             writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
+        #         elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
+        #             writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
                 
-                else:
-                    writer.writerow((device.name, i['time'], i['type']))
-               
+        #         else:
+        #             writer.writerow((device.name, i['time'], i['type']))
+
+
+        #NOTE: visual in console
+        for i in device.line_event:
+            if i['type'] == 'suitcase_start':
+                print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
+            elif i['type'] == 'suitcase_finish':
+                print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
+            else:
+                print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
     
-        #     # for suitcase in device.suitcases_list:
-        #     #     print(suitcase)
-        #     #     print()
+        
     # for device in devices:
     #     print(f'\t╠ НАЗВАНИЕ ДЕВАЙСА {device.name}')
     #     for receipt in device.receipts:
@@ -437,6 +437,7 @@ async def run_app(request: Get_request):
     #         print(f'\t╔═══╩ ЗАКРЫТИЕ ЧЕКА {receipt.receipts_timestamp} \n\t║\n\t║' )
     #     print('\t║\n\t║')
     
+    
 if __name__ == '__main__':
     request = Get_request(pg_user=PG_USER,
                           pg_password=PG_PASSWORD,
@@ -445,7 +446,6 @@ if __name__ == '__main__':
                           date_start=DATE_START,
                           date_finish=DATE_FINISH
                           )
-    # print(type(request))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run_app(request))
     # loop.run_until_complete(request.get_alarm(132))
