@@ -406,10 +406,10 @@ async def run_app(request: Get_request):
         del j, new_list
         
         
-        # for block in device.line_event:
-        #     for event in block:
-        #         print(event)
-        #     print()
+        for block in device.line_event:
+            for event in block:
+                print(event)
+            print()
         
         
         ## NOTE: visual in console
@@ -426,24 +426,24 @@ async def run_app(request: Get_request):
         #     print('breakpoint')
         
         
-        #NOTE: CSV
-        with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file, delimiter=";")
+        # #NOTE: CSV
+        # with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
+        #     writer = csv.writer(file, delimiter=";")
             
-            for block in device.line_event:
-                for i in block:
-                    if i['type'] == 'suitcase_start':
-                        writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
-                    elif i['type'] == 'suitcase_finish':
-                        writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
+        #     for block in device.line_event:
+        #         for i in block:
+        #             if i['type'] == 'suitcase_start':
+        #                 writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
+        #             elif i['type'] == 'suitcase_finish':
+        #                 writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
                     
-                    elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-                        writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
-                    elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                        writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
-                    else:
-                        writer.writerow((device.name, i['time'], i['type']))
-                writer.writerow('')
+        #             elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
+        #                 writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
+        #             elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
+        #                 writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
+        #             else:
+        #                 writer.writerow((device.name, i['time'], i['type']))
+        #         writer.writerow('')
 
     
     #NOTE: FOREST VIEW
@@ -470,5 +470,3 @@ if __name__ == '__main__':
                           )
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run_app(request))
-    # loop.run_until_complete(request.get_alarm(132))
-    
