@@ -123,10 +123,10 @@ class Receipts():
         self.quantitypackagedouble = quantitypackagedouble
         
     def __str__(self):
-        return f'{self.receipts_id}, {len(self.suitcases)}'
+        return f'quantitypackageone: {self.quantitypackageone}'
     
     def __repr__(self):
-        return f'{self.receipts_id}, {len(self.suitcases)}'
+        return f'quantitypackagedouble: {self.quantitypackagedouble}'
         
 
 class Suitcase():
@@ -151,10 +151,10 @@ class Suitcase():
 
 
     def __str__(self):
-        return f'{self.suitcase_id}, {self.suitcase_start}'
+        return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
     
     def __repr__(self):
-        return f'{self.suitcase_id, self.suitcase_start}'
+        return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
 
 
 class Get_request():
@@ -384,7 +384,7 @@ async def run_app(request: Get_request):
         
         
         #NOTE: groupping
-        i = 0 #WORKED:
+        i = 0
         while len(device.line_event) > i:                        
             if i != len(device.line_event)-1:
                 if device.line_event[i]['type'] == 'receipt':
@@ -418,10 +418,14 @@ async def run_app(request: Get_request):
             for event in block:
                 print(event)
             print()
-        
+
+
+        # for block in device.line_event:
+        #     for event in block:
                 
-        
-        # #NOTE: CSV
+
+                
+        # #NOTE: create CSV
         with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
             writer = csv.writer(file, delimiter=";")
             
@@ -432,14 +436,15 @@ async def run_app(request: Get_request):
                         writer.writerow(('420 СЕКУНД', ''))
                         
                     elif i['type'] == 'suitcase_start':
-                        writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ'))
+                        writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}"))
                     elif i['type'] == 'suitcase_finish':
                         writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
                     
                     elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-                        writer.writerow(('', i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
+                        writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
                     elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                        writer.writerow(('', i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
+                        writer.writerow(
+                            ('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
                     else:
                         writer.writerow(('', i['time'], i['type']))
                 writer.writerow('')
@@ -454,5 +459,8 @@ if __name__ == '__main__':
                           date_start=DATE_START,
                           date_finish=DATE_FINISH
                           )
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_app(request))
+
+    from time import time
+    t1 = time()
+    asyncio.run(run_app(request))
+    print(f"Passed: {round(time() - t1, 2)}")
