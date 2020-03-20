@@ -16,8 +16,8 @@ PG_PASSWORD = '1'
 PG_HOST = 'localhost'
 PG_DB = 'control_db'
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-DATE_START = '2020-01-01'
-DATE_FINISH = '2020-01-02'
+DATE_START = '2020-01-01 00:00'
+DATE_FINISH = '2020-01-02 00:00'
 TIMEDELTA_CHECK = 420
 
 
@@ -56,6 +56,7 @@ class Device():
     receipts_list = list() # ЧЕКИ
     suitcases_list = list() # УПАКОВКИ
     line_event = list()
+    broken_line_event = list()
     
     def __init__(self, device_id, 
                        name):
@@ -66,6 +67,7 @@ class Device():
         self.receipts_list = list()
         self.suitcases_list = list()
         self.line_event = list()
+        self.broken_line_event = list()
     
     
     def __repr__(self):
@@ -314,6 +316,7 @@ class Get_request():
     
 
 async def run_app(request: Get_request):
+    global count
     devices = await request.get_devices()
     
     for device in devices:
@@ -404,7 +407,8 @@ async def run_app(request: Get_request):
                 new_list[j].append(device.line_event.pop(0))
             else:
                 if device.line_event[0].get('ДРОБЛЕНИЕ ПО ПРИЗНАКУ'):
-                    new_list.append([{'ДРОБЛЕНИЕ ПО ПРИЗНАКУ': "ВРЕМЯ"}])
+                    new_list.append([{'type': 'broken', 
+                                      'ДРОБЛЕНИЕ ПО ПРИЗНАКУ': 'ВРЕМЯ'}])
                 else:
                     new_list.append([])
                 j += 1
@@ -414,26 +418,48 @@ async def run_app(request: Get_request):
         del j, new_list
         
         
+         # search len(suitcase) = len(receipts)
+        package_type_one = 0
+        package_type_two = 0
+        quantitypackageone = 0
+        quantitypackagedouble = 0        
         for block in device.line_event:
             for event in block:
-                print(event)
-            print()
-
-
+                if event['type'] == 'suitcase_start' and event['object'].package_type == 1:
+                    package_type_one += 1
+                elif event['type'] == 'suitcase_start' and event['object'].package_type == 2:
+                    package_type_two += 1
+                    
+                elif event['type'] == 'receipt' and event['object'].quantitypackageone > 0:
+                    quantitypackageone += event['object'].quantitypackageone
+                elif event['type'] == 'receipt' and event['object'].quantitypackagedouble > 0:
+                    quantitypackagedouble += event['object'].quantitypackagedouble
+                    
+            if package_type_one != quantitypackageone or package_type_two != quantitypackagedouble:
+                device.broken_line_event.append(block)
+                device.line_event.remove(block)
+            package_type_one = 0
+            package_type_two = 0
+            quantitypackageone = 0
+            quantitypackagedouble = 0
+        del package_type_one, package_type_two, quantitypackageone, quantitypackagedouble
+        
+        
         # for block in device.line_event:
+        #     print(block)
         #     for event in block:
-                
+        #         print(event)
 
-                
-        # #NOTE: create CSV
+        
+        #NOTE: create CSV
         with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
             writer = csv.writer(file, delimiter=";")
             
-            for block in device.line_event:
+            for block in device.broken_line_event:
                 writer.writerow((device.name,''))
                 for i in block:
-                    if i.get("ДРОБЛЕНИЕ ПО ПРИЗНАКУ"):
-                        writer.writerow(('420 СЕКУНД', ''))
+                    if i['type'] == 'broken':
+                        writer.writerow((i['type'], f"ПРЕВЫШЕНИЕ ПО ВРЕМЕНИ МЕЖДУ УПАКОВКАМИ {TIMEDELTA_CHECK}"))
                         
                     elif i['type'] == 'suitcase_start':
                         writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}"))
@@ -443,15 +469,19 @@ async def run_app(request: Get_request):
                     elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
                         writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
                     elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                        writer.writerow(
-                            ('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
-                    else:
-                        writer.writerow(('', i['time'], i['type']))
+                        writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
+                        
+                    elif i['type'] == 'issue':
+                        writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
+                    elif i['type'] == 'alarm':
+                        writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
+                count += 1
                 writer.writerow('')
-
-  
+            writer.writerow(("Всего в этот список попало:",count))
+    print(count)
     
 if __name__ == '__main__':
+    count = 0
     request = Get_request(pg_user=PG_USER,
                           pg_password=PG_PASSWORD,
                           pg_host=PG_HOST,
