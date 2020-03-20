@@ -3,7 +3,7 @@ import asyncpg
 
 import csv
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -18,6 +18,7 @@ PG_DB = 'control_db'
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 DATE_START = '2020-01-01'
 DATE_FINISH = '2020-01-02'
+TIMEDELTA_CHECK = 420
 
 
 class Alarm():
@@ -383,23 +384,30 @@ async def run_app(request: Get_request):
         
         
         #NOTE: groupping
-        i = 0
+        i = 0 #WORKED:
         while len(device.line_event) > i:                        
             if i != len(device.line_event)-1:
                 if device.line_event[i]['type'] == 'receipt':
                     if device.line_event[i+1]['type'] in {'suitcase_start', 'issue', 'alarm'}:
                         device.line_event.insert(i+1, {"type": "none"})
+                elif device.line_event[i]['type'] != 'none' and device.line_event[i+1]['time'] - device.line_event[i]['time'] > timedelta(seconds=TIMEDELTA_CHECK):
+                    device.line_event.insert(i+1, {"type": "none", "ДРОБЛЕНИЕ ПО ПРИЗНАКУ": "ВРЕМЯ"})
             i += 1
         del i
         
+        
+        #NOTE: create [[s], [s], [s]]  
         new_list = [[]]
         j = 0
         while len(device.line_event) > 0:
             if device.line_event[0]['type'] != 'none':
                 new_list[j].append(device.line_event.pop(0))
             else:
+                if device.line_event[0].get('ДРОБЛЕНИЕ ПО ПРИЗНАКУ'):
+                    new_list.append([{'ДРОБЛЕНИЕ ПО ПРИЗНАКУ': "ВРЕМЯ"}])
+                else:
+                    new_list.append([])
                 j += 1
-                new_list.append([])
                 device.line_event.pop(0)
                 
         device.line_event = new_list
@@ -411,54 +419,32 @@ async def run_app(request: Get_request):
                 print(event)
             print()
         
-        
-        ## NOTE: visual in console
-        # for i in device.line_event:
-        #     if i == "":
-        #         print()
-        #     elif i['type'] == 'suitcase_start':
-        #         print(f"{device.name} - {i['time']} - НАЧАЛО УПАКОВКИ")
-        #     elif i['type'] == 'suitcase_finish':
-        #         print(f"{device.name} - {i['time']} - КОНЕЦ УПАКОВКИ")
-        #     else:
-        #         print(f"{device.name} - {i['time']} - {i['type']} - {i['object']}")
-            
-        #     print('breakpoint')
-        
+                
         
         # #NOTE: CSV
-        # with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
-        #     writer = csv.writer(file, delimiter=";")
+        with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
+            writer = csv.writer(file, delimiter=";")
             
-        #     for block in device.line_event:
-        #         for i in block:
-        #             if i['type'] == 'suitcase_start':
-        #                 writer.writerow((device.name, i['time'], 'НАЧАЛО УПАКОВКИ'))
-        #             elif i['type'] == 'suitcase_finish':
-        #                 writer.writerow((device.name, i['time'], "КОНЕЦ УПАКОВКИ"))
+            for block in device.line_event:
+                writer.writerow((device.name,''))
+                for i in block:
+                    if i.get("ДРОБЛЕНИЕ ПО ПРИЗНАКУ"):
+                        writer.writerow(('420 СЕКУНД', ''))
+                        
+                    elif i['type'] == 'suitcase_start':
+                        writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ'))
+                    elif i['type'] == 'suitcase_finish':
+                        writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
                     
-        #             elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-        #                 writer.writerow((device.name, i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
-        #             elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-        #                 writer.writerow((device.name, i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
-        #             else:
-        #                 writer.writerow((device.name, i['time'], i['type']))
-        #         writer.writerow('')
+                    elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
+                        writer.writerow(('', i['time'], i['type'], f"quantitypackageone: {i['object'].quantitypackageone}"))
+                    elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
+                        writer.writerow(('', i['time'], i['type'], f"quantitypackagedouble: {i['object'].quantitypackagedouble}"))
+                    else:
+                        writer.writerow(('', i['time'], i['type']))
+                writer.writerow('')
 
-    
-    #NOTE: FOREST VIEW
-    # for device in devices:
-    #     print(f'\t╠ НАЗВАНИЕ ДЕВАЙСА {device.name}')
-    #     for receipt in device.receipts:
-    #         print(f'\t╚═══╦ НАЧАЛО ЧЕКА {receipt.receipts_id}')
-    #         for suitcase in receipt.suitcases:
-    #             print(f'\t    ╚═══╦ НАЧАЛО УПАКОВКИ {suitcase.suitcase_start}')
-    #             for issue in suitcase.suitcase_issue:
-    #                 print(f'\t        ╠════ ОПОВЕЩЕНИЯ {issue.issue_time}')
-    #             print(f'\t    ╔═══╩ КОНЕЦ УПАКОВКИ {suitcase.suitcase_finish}')
-    #         print(f'\t╔═══╩ ЗАКРЫТИЕ ЧЕКА {receipt.receipts_timestamp} \n\t║\n\t║' )
-    #     print('\t║\n\t║')
-    
+  
     
 if __name__ == '__main__':
     request = Get_request(pg_user=PG_USER,
