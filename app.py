@@ -22,7 +22,7 @@ TIMEDELTA_CHECK = 420
 
 
 class Alarm():
-    '''КЛАСС С УВЕДОМЛЕНИЯМИ'''
+    '''Класс, содержащий информацию о уведомлениях'''
     
     alarm_time = ''
     alarm_id = int()
@@ -48,7 +48,8 @@ class Alarm():
 
 
 class Device():
-    '''КЛАСС ДЕВАЙСОВ'''
+    '''Класс, содержащий информацию о устройствах для упаковки.'''
+
     name = str()
     device_id = int()
     alarm_list = list() # УВЕДОМЛЕНИЯ
@@ -79,7 +80,8 @@ class Device():
 
 
 class Issue():
-    '''КЛАСС С ОПОВЕЩЕНИЯМИ'''
+    '''Класс, содержащий информацию о оповещениях.'''
+
     suitcase_id = int()
     issue_time = ''
     issue_device_id = int()
@@ -104,7 +106,8 @@ class Issue():
         
     
 class Receipts():
-    '''КЛАСС С ЧЕКАМИ'''
+    '''Класс, содержащий информацию о чеках.'''
+
     receipts_id = int()
     receipts_timestamp = ''
     device_id = int()
@@ -132,7 +135,8 @@ class Receipts():
         
 
 class Suitcase():
-    '''КЛАСС С УПАКОВКАМИ'''
+    '''Класс, содержащий информацию о упаковках'''
+
     suitcase_id = int()
     suitcase_start = ''
     suitcase_finish = ''
@@ -160,7 +164,8 @@ class Suitcase():
 
 
 class Get_request():
-    '''ЗАПРОСЫ К БАЗЕ'''
+    '''Класс с запросами к базе.'''
+
     def __init__(self, pg_user, 
                        pg_password, 
                        pg_host, 
@@ -176,14 +181,17 @@ class Get_request():
         
     
     async def connect(self):
-        '''ПОДКЛЮЧЕНИЕ К БАЗЕ'''
+        '''Создание подключения к базе.'''
+
         conn = await asyncpg.connect(
             f'postgresql://{self.pg_user}:{self.pg_password}@{self.pg_host}/{self.pg_db}')
         return conn
     
     
     async def get_devices(self):
-        '''ПОЛУЧЕНИЕ СПИСКА ДЕВАЙСОВ'''
+        '''Получение списка активных устройств упаковки из базы. 
+        Создание списка экземпляров классов Device'''
+
         conn = await self.connect()
         
         rows = await conn.fetch('\
@@ -203,7 +211,9 @@ class Get_request():
     
     
     async def get_alarm(self, device_id):
-        '''ПОЛУЧЕНИЕ УВЕДОМЛЕНИЙ'''
+        '''Получение уведомлений из базы. 
+        Создание списка экземпляров классов Alarm'''
+
         
         conn = await self.connect()
 
@@ -231,7 +241,9 @@ class Get_request():
         
         
     async def get_issue(self, device_id):
-        '''ПОЛУЧЕНИЕ ОПОВЕЩЕНИЙ(должны жить внутри упаковки)'''
+        '''Получение оповещений из базы. 
+        Создание списка экземпляров классов Issue'''
+
         conn = await self.connect()
         
         rows = await conn.fetch(f"\
@@ -258,7 +270,9 @@ class Get_request():
     
     
     async def get_receipts(self, device_id):
-        '''ПОЛУЧЕНИЕ ЧЕКОВ'''
+        '''Получение чеков из базы. 
+        Создание списка экземпляров классов Receipts'''
+
         conn = await self.connect()
 
         #WORKED: dateopen
@@ -290,7 +304,9 @@ class Get_request():
     
     
     async def get_suitcases(self, device_id):
-        '''ПОЛУЧЕНИЕ УПАКОВОК'''
+        '''Получение упаковок из базы. 
+        Создание списка экземпляров классов Suitcase'''
+
         conn = await self.connect()
         
         rows = await conn.fetch(f"\
@@ -313,10 +329,12 @@ class Get_request():
                                   )
             
         return suitcases_list.copy()
-    
+
 
 async def run_app(request: Get_request):
-    global count
+    '''Получение списка устройств для упаковок, событий к ним,
+    добавление всех событий в список словарей. Сортировка словаря.'''
+
     devices = await request.get_devices()
     
     for device in devices:
@@ -361,127 +379,143 @@ async def run_app(request: Get_request):
                 )
             
         device.line_event.sort(key=lambda d: d['time'])
+        sort_receipts(device)
         
         
-        # NOTE: drobbing 
-        last = None
-        for i in range(len(device.line_event)):
-            if device.line_event[i]['type'] in {'suitcase_start', 'suitcase_finish'}:
-                last = device.line_event[i]['type']
+def sort_receipts(device):
+    '''Правка событий по признаку "чек после упаковки"'''
+
+    last = None
+    for i in range(len(device.line_event)):
+        if device.line_event[i]['type'] in {'suitcase_start', 'suitcase_finish'}:
+            last = device.line_event[i]['type']
+        if device.line_event[i]['type'] == 'receipt':
+            if last == None:
+                j = i
+                while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
+                    j += 1
+                if j < len (device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
+                    t = device.line_event.pop(i)
+                    device.line_event.insert(j, t)
+            if last == 'suitcase_start':
+                j = i
+                while j < len(device.line_event) and device.line_event[j]['type'] != 'suitcase_finish':
+                    j += 1
+                if j < len(device.line_event):
+                    t = device.line_event.pop(i)
+                    device.line_event.insert(j, t)
+    grouping_events(device)
+
+
+def grouping_events(device):
+    '''Группировка событий по признаку "полный цикл". Добавление события "none"
+    после каждого полного цикла упаковки. Проверка на время между упаковками
+    с одним чеком(не более TIMEDELTA_CHECK)'''
+
+    i = 0
+    while len(device.line_event) > i:                        
+        if i != len(device.line_event)-1:
             if device.line_event[i]['type'] == 'receipt':
-                if last == None:
-                    j = i
-                    while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
-                        j += 1
-                    if j < len (device.line_event) and device.line_event[j]['type'] == 'suitcase_finish':
-                        t = device.line_event.pop(i)
-                        device.line_event.insert(j, t)
-                if last == 'suitcase_start':
-                    j = i
-                    while j < len(device.line_event) and device.line_event[j]['type'] != 'suitcase_finish':
-                        j += 1
-                    if j < len(device.line_event):
-                        t = device.line_event.pop(i)
-                        device.line_event.insert(j, t)
-        del last
-        
-        
-        #NOTE: groupping
-        i = 0
-        while len(device.line_event) > i:                        
-            if i != len(device.line_event)-1:
-                if device.line_event[i]['type'] == 'receipt':
-                    if device.line_event[i+1]['type'] in {'suitcase_start', 'issue', 'alarm'}:
-                        device.line_event.insert(i+1, {"type": "none"})
-                elif device.line_event[i]['type'] != 'none' and device.line_event[i+1]['time'] - device.line_event[i]['time'] > timedelta(seconds=TIMEDELTA_CHECK):
-                    device.line_event.insert(i+1, {"type": "none", "ДРОБЛЕНИЕ ПО ПРИЗНАКУ": "ВРЕМЯ"})
-            i += 1
-        del i
-        
-        
-        #NOTE: create [[s], [s], [s]]  
-        new_list = [[]]
-        j = 0
-        while len(device.line_event) > 0:
-            if device.line_event[0]['type'] != 'none':
-                new_list[j].append(device.line_event.pop(0))
+                if device.line_event[i+1]['type'] in {'suitcase_start', 'issue', 'alarm'}:
+                    device.line_event.insert(i+1, {"type": "none"})
+            elif device.line_event[i]['type'] != 'none' and device.line_event[i+1]['time'] - device.line_event[i]['time'] > timedelta(seconds=TIMEDELTA_CHECK):
+                device.line_event.insert(i+1, {"type": "none", "ДРОБЛЕНИЕ ПО ПРИЗНАКУ": "ВРЕМЯ"})
+        i += 1
+    listing_events(device)
+
+
+def listing_events(device):
+    '''Создание списка списков словарей. Каждый элемент главного списка - это
+    список, который содержит в себе n-элементов словарей событий полного
+    цикла упаковки'''
+    
+    new_list = [[]]
+    j = 0
+    while len(device.line_event) > 0:
+        if device.line_event[0]['type'] != 'none':
+            new_list[j].append(device.line_event.pop(0))
+        else:
+            if device.line_event[0].get('ДРОБЛЕНИЕ ПО ПРИЗНАКУ'):
+                new_list.append([{'type': 'broken', 
+                                    'ДРОБЛЕНИЕ ПО ПРИЗНАКУ': 'ВРЕМЯ'}])
             else:
-                if device.line_event[0].get('ДРОБЛЕНИЕ ПО ПРИЗНАКУ'):
-                    new_list.append([{'type': 'broken', 
-                                      'ДРОБЛЕНИЕ ПО ПРИЗНАКУ': 'ВРЕМЯ'}])
-                else:
-                    new_list.append([])
-                j += 1
-                device.line_event.pop(0)
+                new_list.append([])
+            j += 1
+            device.line_event.pop(0)
+    device.line_event = new_list
+    check_broked_events(device)
+
+
+def check_broked_events(device):
+    '''Проверка упаковок на наличие чеков к ним
+    device.broken_line_event - список бракованных упаковок.
+    device.line_event - список успешных упаковок.'''
+
+    package_type_one = 0
+    package_type_two = 0
+    quantitypackageone = 0
+    quantitypackagedouble = 0        
+    for block in device.line_event:
+        for event in block:
+            if event['type'] == 'suitcase_start' and event['object'].package_type == 1:
+                package_type_one += 1
+            elif event['type'] == 'suitcase_start' and event['object'].package_type == 2:
+                package_type_two += 1
                 
-        device.line_event = new_list
-        del j, new_list
-        
-        
-         # search len(suitcase) = len(receipts)
+            elif event['type'] == 'receipt' and event['object'].quantitypackageone > 0:
+                quantitypackageone += event['object'].quantitypackageone
+            elif event['type'] == 'receipt' and event['object'].quantitypackagedouble > 0:
+                quantitypackagedouble += event['object'].quantitypackagedouble
+                
+        if package_type_one != quantitypackageone or package_type_two != quantitypackagedouble:
+            device.broken_line_event.append(block)
+            device.line_event.remove(block)
         package_type_one = 0
         package_type_two = 0
         quantitypackageone = 0
-        quantitypackagedouble = 0        
-        for block in device.line_event:
-            for event in block:
-                if event['type'] == 'suitcase_start' and event['object'].package_type == 1:
-                    package_type_one += 1
-                elif event['type'] == 'suitcase_start' and event['object'].package_type == 2:
-                    package_type_two += 1
-                    
-                elif event['type'] == 'receipt' and event['object'].quantitypackageone > 0:
-                    quantitypackageone += event['object'].quantitypackageone
-                elif event['type'] == 'receipt' and event['object'].quantitypackagedouble > 0:
-                    quantitypackagedouble += event['object'].quantitypackagedouble
-                    
-            if package_type_one != quantitypackageone or package_type_two != quantitypackagedouble:
-                device.broken_line_event.append(block)
-                device.line_event.remove(block)
-            package_type_one = 0
-            package_type_two = 0
-            quantitypackageone = 0
-            quantitypackagedouble = 0
-        del package_type_one, package_type_two, quantitypackageone, quantitypackagedouble
-        
-        
-        # for block in device.line_event:
-        #     print(block)
-        #     for event in block:
-        #         print(event)
+        quantitypackagedouble = 0
+    create_csv(device)
 
+
+def view_console(device):
+    '''Визуализация в консоль'''
+
+    for block in device.line_event:
+        print(block)
+        for event in block:
+            print(event)
+
+
+def create_csv(device):
+    '''Cоздание CSV-файла с данными'''
+
+    with open('suitcases_broken.csv', 'a', encoding='utf-8', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
         
-        #NOTE: create CSV
-        with open('suitcases.csv', 'a', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file, delimiter=";")
-            
-            for block in device.broken_line_event:
-                writer.writerow((device.name,''))
-                for i in block:
-                    if i['type'] == 'broken':
-                        writer.writerow((i['type'], f"ПРЕВЫШЕНИЕ ПО ВРЕМЕНИ МЕЖДУ УПАКОВКАМИ {TIMEDELTA_CHECK}"))
-                        
-                    elif i['type'] == 'suitcase_start':
-                        writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}"))
-                    elif i['type'] == 'suitcase_finish':
-                        writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
+        for block in device.broken_line_event:
+            writer.writerow((device.name,''))
+            for i in block:
+                if i['type'] == 'broken':
+                    writer.writerow((i['type'], f"ПРЕВЫШЕНИЕ ПО ВРЕМЕНИ МЕЖДУ УПАКОВКАМИ {TIMEDELTA_CHECK}"))
                     
-                    elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-                        writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
-                    elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                        writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
-                        
-                    elif i['type'] == 'issue':
-                        writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
-                    elif i['type'] == 'alarm':
-                        writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
-                count += 1
-                writer.writerow('')
-            writer.writerow(("Всего в этот список попало:",count))
-    print(count)
+                elif i['type'] == 'suitcase_start':
+                    writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}"))
+                elif i['type'] == 'suitcase_finish':
+                    writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
+                
+                elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
+                    writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
+                elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
+                    writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
+                    
+                elif i['type'] == 'issue':
+                    writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
+                elif i['type'] == 'alarm':
+                    writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
+            writer.writerow('')
+    
     
 if __name__ == '__main__':
-    count = 0
     request = Get_request(pg_user=PG_USER,
                           pg_password=PG_PASSWORD,
                           pg_host=PG_HOST,
@@ -492,5 +526,5 @@ if __name__ == '__main__':
 
     from time import time
     t1 = time()
-    asyncio.run(run_app(request))
+    device = asyncio.run(run_app(request))
     print(f"Passed: {round(time() - t1, 2)}")
