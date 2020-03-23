@@ -1,24 +1,22 @@
-import asyncio
 import asyncpg
 
+import asyncio
 import csv
 import logging
 from datetime import datetime, timedelta
 
+from config import (PG_USER,
+                    PG_PASSWORD,
+                    PG_HOST,
+                    PG_DB,
+                    DATE_FORMAT,
+                    DATE_START,
+                    DATE_FINISH,
+                    TIMEDELTA_CHECK)
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - \
                     %(levelname)s - %(message)s')
-
-
-PG_USER = 'postgres'
-PG_PASSWORD = '1'
-PG_HOST = 'localhost'
-PG_DB = 'control_db'
-DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-DATE_START = '2020-01-01 00:00'
-DATE_FINISH = '2020-01-02 00:00'
-TIMEDELTA_CHECK = 420
 
 
 class Alarm():
