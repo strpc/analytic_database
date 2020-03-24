@@ -316,7 +316,7 @@ class Get_request():
                                  )
         return receipts_list.copy()
 
-    async def get_suitcases(self, device_id):
+    async def get_suitcases(self, device_id  ):
         '''
         Получение упаковок из базы. 
         Создание списка экземпляров классов Suitcase
@@ -404,12 +404,13 @@ async def run_app(request: Get_request):
         sort_receipts(device)
 
 
-def sort_receipts(device):
+def sort_receipts(device: Device):
     '''
     Правка событий по признаку "чек после упаковки".
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
+
 
     last = None
     for i in range(len(device.line_event)):
@@ -433,13 +434,13 @@ def sort_receipts(device):
     grouping_events(device)
 
 
-def grouping_events(device):
+def grouping_events(device: Device):
     '''
     Группировка событий по признаку "полный цикл". Добавление события "none"
     после каждого полного цикла упаковки. Проверка на время между упаковками
-    с одним чеком(не более TIMEDELTA_CHECK).
+    (не более TIMEDELTA_CHECK).
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
     i = 0
@@ -454,13 +455,13 @@ def grouping_events(device):
     listing_events(device)
 
 
-def listing_events(device):
+def listing_events(device: Device):
     '''
     Создание списка списков словарей. Каждый элемент главного списка - это
     список, который содержит в себе n-элементов словарей событий полного
     цикла упаковки.
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
     new_list = [[]]
@@ -480,19 +481,17 @@ def listing_events(device):
     check_broked_events(device)
 
 
-def check_broked_events(device):
+def check_broked_events(device: Device):
     '''
     Проверка упаковок на наличие чеков к ним
     device.broken_line_event - список бракованных упаковок.
     device.line_event - список успешных упаковок.
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
-    package_type_one = 0
-    package_type_two = 0
-    quantitypackageone = 0
-    quantitypackagedouble = 0
+    package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
+
     for block in device.line_event:
         for event in block:
             if event['type'] == 'suitcase_start' and event['object'].package_type == 1:
@@ -504,35 +503,73 @@ def check_broked_events(device):
                 quantitypackageone += event['object'].quantitypackageone
             elif event['type'] == 'receipt' and event['object'].quantitypackagedouble > 0:
                 quantitypackagedouble += event['object'].quantitypackagedouble
-
         if package_type_one != quantitypackageone or package_type_two != quantitypackagedouble:
             device.broken_line_event.append(block)
             device.line_event.remove(block)
-        package_type_one = 0
-        package_type_two = 0
-        quantitypackageone = 0
-        quantitypackagedouble = 0
+        package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
+
+    add_task(device)
+    
+    
+def add_task(device: Device):
+    '''
+    Добавления типа задачи для каждого блока с событиями
+    
+    :param device: элемент списка экземпляров активных устройств класса Device.
+    '''
+    count_alarm = count_issue = count_receipt = count_suitcase_start = 0
+    
+    for block in device.broken_line_event:
+        for event in block:
+            if event['type'] == 'alarm':
+                count_alarm += 1
+            elif event['type'] == 'issue':
+                count_issue += 1
+            elif event['type'] == 'receipt':
+                count_receipt += 1
+            elif event['type'] == 'suitcase_start':
+                count_suitcase_start += 1
+        
+        if count_alarm != 0 and count_issue == count_receipt == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'уведомление', 'type': 'service'})
+        elif count_issue != 0 and count_alarm == count_receipt == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
+        
+        elif count_receipt != 0 and count_suitcase_start == 0 and 0 not in {count_issue, count_alarm}:
+            block.insert(0, {'task_type': 'чеки без упаковок', 'type': 'service'})
+
+        elif count_receipt != 0 and count_alarm == count_issue == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
+            
+        elif 0 not in {count_suitcase_start, count_receipt} and (count_issue or count_alarm):
+            block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
+            
+        else:
+            block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'}) 
+        count_alarm = count_issue = count_receipt = count_suitcase_start = 0
+    
     create_csv(device)
 
+    
 
-def view_console(device):
+def view_console(device: Device):
     '''
     Визуализация в консоль
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
     for block in device.line_event:
-        print(block)
+        # print(block)
         for event in block:
             print(event)
 
 
-def create_csv(device):
+def create_csv(device: Device):
     '''
     Cоздание CSV-файла с данными.
     
-    :param device: список экземпляров активных устройств класса Device.
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
     with open('suitcases_broken.csv', 'a', encoding='utf-8', newline='') as file:
@@ -541,7 +578,9 @@ def create_csv(device):
         for block in device.broken_line_event:
             writer.writerow((device.name, ''))
             for i in block:
-                if i['type'] == 'broken':
+                if i['type'] == 'service':
+                    writer.writerow(('','task_type:', i['task_type']))
+                elif i['type'] == 'broken':
                     writer.writerow((i['type'], f"ПРЕВЫШЕНИЕ ПО ВРЕМЕНИ МЕЖДУ УПАКОВКАМИ {TIMEDELTA_CHECK}"))
 
                 elif i['type'] == 'suitcase_start':
@@ -558,6 +597,9 @@ def create_csv(device):
                     writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
                 elif i['type'] == 'alarm':
                     writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
+                    
+                # elif i['task_type'] == '':
+                #     writer.writerow(('', 'task_type', i['task_type'], ))
             writer.writerow('')
 
 
