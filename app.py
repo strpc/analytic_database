@@ -530,22 +530,20 @@ def add_task(device: Device):
             elif event['type'] == 'suitcase_start':
                 count_suitcase_start += 1
         
-        if count_alarm != 0 and count_issue == count_receipt == count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'уведомление', 'type': 'service'})
-        elif count_issue != 0 and count_alarm == count_receipt == count_suitcase_start == 0:
+        if count_issue != 0 and count_receipt == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
         
-        elif count_receipt != 0 and count_suitcase_start == 0 and 0 not in {count_issue, count_alarm}:
-            block.insert(0, {'task_type': 'чеки без упаковок', 'type': 'service'})
+        elif (count_receipt != 0 and count_issue == count_suitcase_start == 0) or (count_suitcase_start != 0 and count_receipt != 0 and count_suitcase_start < count_receipt):
+            block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
 
-        elif count_receipt != 0 and count_alarm == count_issue == count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
-            
-        elif 0 not in {count_suitcase_start, count_receipt} and (count_issue or count_alarm):
-            block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
-            
-        else:
+        elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'чеки без упаковок и уведомление', 'type': 'service'}) 
+        
+        elif count_suitcase_start != 0 and count_receipt != 0 and count_suitcase_start > count_receipt:
             block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'}) 
+        
+        else:
+            block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
         count_alarm = count_issue = count_receipt = count_suitcase_start = 0
     
     create_csv(device)
@@ -592,7 +590,7 @@ def create_csv(device: Device):
                     writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
                 elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
                     writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
-
+                # NOTE: уведомления/оповещения
                 elif i['type'] == 'issue':
                     writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
                 elif i['type'] == 'alarm':
