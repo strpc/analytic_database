@@ -438,7 +438,7 @@ def grouping_events(device: Device):
     '''
     Группировка событий по признаку "полный цикл". Добавление события "none"
     после каждого полного цикла упаковки. Проверка на время между упаковками
-    (не более TIMEDELTA_CHECK).
+    (не более TIMEDELTA_CHECK). 
     
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
@@ -513,7 +513,9 @@ def check_broked_events(device: Device):
     
 def add_task(device: Device):
     '''
-    Добавления типа задачи для каждого блока с событиями
+    Добавления типа задачи 
+    {'task_type': '', 'type': 'service'}
+    для каждого блока с событиями
     
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
@@ -545,6 +547,8 @@ def add_task(device: Device):
         else:
             block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
         count_alarm = count_issue = count_receipt = count_suitcase_start = 0
+    
+    
     
     create_csv(device)
 
