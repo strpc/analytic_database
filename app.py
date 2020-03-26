@@ -44,11 +44,9 @@ class Alarm():
 
     def __str__(self):
         return f'{self.alarm_type}'
-        # return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
 
     def __repr__(self):
         return f'{self.alarm_type}'
-        # return f'{self.alarm_id}, {self.alarm_time}, {self.alarm_device_id}'
 
 
 class Device():
@@ -102,11 +100,9 @@ class Issue():
 
     def __str__(self):
         return f'{self.issue_type}'
-        # return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
 
     def __repr__(self):
         return f'{self.issue_type}'
-        # return f'{self.suitcase_id}, {self.issue_time}, {self.device_id}'
 
 
 class Receipts():
