@@ -10,7 +10,7 @@ import csv
 import logging
 from datetime import datetime, timedelta
 
-from config import (PG_USER,
+from config import (PG_USER, _
                     PG_PASSWORD,
                     PG_HOST,
                     PG_DB,
