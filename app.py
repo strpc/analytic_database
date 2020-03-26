@@ -10,7 +10,7 @@ import csv
 import logging
 from datetime import datetime, timedelta
 
-from config import (PG_USER, _
+from config import (PG_USER,
                     PG_PASSWORD,
                     PG_HOST,
                     PG_DB,
@@ -21,8 +21,7 @@ from config import (PG_USER, _
 
 
 logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - \
-                    %(levelname)s - %(message)s')
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
 class Alarm():
@@ -116,7 +115,6 @@ class Receipts():
     receipts_id = int()
     receipts_timestamp = ''
     device_id = int()
-    suitcases = list()
     quantitypackageone = ''
     quantitypackagedouble = ''
 
@@ -129,7 +127,6 @@ class Receipts():
         self.receipts_id = receipts_id
         self.receipts_timestamp = receipts_timestamp
         self.device_id = device_id
-        self.suitcases = list()
         self.quantitypackageone = quantitypackageone
         self.quantitypackagedouble = quantitypackagedouble
 
@@ -146,8 +143,6 @@ class Suitcase():
     suitcase_id = int()
     suitcase_start = ''
     suitcase_finish = ''
-    suitcase_issue = list() # FIXME:
-    suitcase_alarm = list() # FIXME:
     package_type = ''
 
     def __init__(self,
@@ -158,8 +153,6 @@ class Suitcase():
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
-        self.suitcase_issue = list() # FIXME:
-        self.suitcase_alarm = list() # FIXME:
         self.package_type = package_type
 
     def __str__(self):
