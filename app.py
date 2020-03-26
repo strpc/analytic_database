@@ -146,8 +146,8 @@ class Suitcase():
     suitcase_id = int()
     suitcase_start = ''
     suitcase_finish = ''
-    suitcase_issue = list()
-    suitcase_alarm = list()
+    suitcase_issue = list() # FIXME:
+    suitcase_alarm = list() # FIXME:
     package_type = ''
 
     def __init__(self,
@@ -158,8 +158,8 @@ class Suitcase():
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
-        self.suitcase_issue = list()
-        self.suitcase_alarm = list()
+        self.suitcase_issue = list() # FIXME:
+        self.suitcase_alarm = list() # FIXME:
         self.package_type = package_type
 
     def __str__(self):
@@ -519,7 +519,9 @@ def add_task(device: Device):
     
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
+    
     count_alarm = count_issue = count_receipt = count_suitcase_start = 0
+    package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
     
     for block in device.broken_line_event:
         for event in block:
@@ -527,26 +529,41 @@ def add_task(device: Device):
                 count_alarm += 1
             elif event['type'] == 'issue':
                 count_issue += 1
+            
             elif event['type'] == 'receipt':
                 count_receipt += 1
+                if event['object'].quantitypackageone > 0:
+                    quantitypackageone += event['object'].quantitypackageone
+                if event['object'].quantitypackagedouble > 0:
+                    quantitypackagedouble += event['object'].quantitypackagedouble
+            
             elif event['type'] == 'suitcase_start':
                 count_suitcase_start += 1
+                if event['object'].package_type == 1:
+                    package_type_one += 1
+                if event['object'].package_type == 2:
+                    package_type_two += 1
         
         if count_issue != 0 and count_receipt == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
         
-        elif (count_receipt != 0 and count_issue == count_suitcase_start == 0) or (count_suitcase_start != 0 and count_receipt != 0 and count_suitcase_start < count_receipt):
+        elif count_receipt != 0 and count_issue == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
+        
+        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone >= package_type_one or quantitypackagedouble >= package_type_two): #FIXME:
             block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
 
         elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чеки без упаковок и уведомление', 'type': 'service'}) 
         
-        elif count_suitcase_start != 0 and count_receipt != 0 and count_suitcase_start > count_receipt:
-            block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'}) 
+        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone <= package_type_one or quantitypackagedouble <= package_type_two):
+            block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'})
         
         else:
             block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
         count_alarm = count_issue = count_receipt = count_suitcase_start = 0
+        package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
+        
     
     
     
@@ -597,8 +614,8 @@ def create_csv(device: Device):
                 # NOTE: уведомления/оповещения
                 elif i['type'] == 'issue':
                     writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
-                elif i['type'] == 'alarm':
-                    writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
+                # elif i['type'] == 'alarm':
+                #     writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
                     
                 # elif i['task_type'] == '':
                 #     writer.writerow(('', 'task_type', i['task_type'], ))
