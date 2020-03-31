@@ -3,8 +3,6 @@
 
 """
 
-import asyncpg
-
 import asyncio
 import csv
 import logging
@@ -189,8 +187,11 @@ def check_broked_events(device: Device):
     
 def add_task(device: Device):
     '''
-    Добавления типа задачи 
-    {'task_type': '', 'type': 'service'}
+    Добавления типа задачи:
+    оповещение, чек без упаковок, чеки без упаковок и уведомление, 
+    КПУ/КнПУ, смешанные
+    в ключ словаря task_type
+    {'task_type': '% %', 'type': 'service'}
     для каждого блока с событиями
     
     :param device: элемент списка экземпляров активных устройств класса Device.
@@ -241,23 +242,106 @@ def add_task(device: Device):
         package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
         
     
+    add_receipt_to_line_event(device)
+    add_receipt_to_suitcase_broken(device)
     
     
-    view_console(device)
+def add_receipt_to_line_event(device: Device):
+    '''
+    Присваивание чека каждой упаковке внутри списка "положительных" упаковок
+    device.line_event
+    
+    :param device: элемент списка экземпляров активных устройств класса Device.
+    '''
+    new_list = []
+    
+    for block in device.line_event:
+        package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
+        
+        for event in block:
+            if event['type'] == 'receipt':
+                if event['object'].quantitypackageone > 0:
+                    quantitypackageone += event['object'].quantitypackageone
+                elif event['object'].quantitypackagedouble > 0:
+                    quantitypackagedouble += event['object'].quantitypackagedouble
+            elif event['type'] == 'suitcase_start':
+                if event['object'].package_type == 1:
+                    package_type_one += 1
+                elif event['object'].package_type == 2:
+                    package_type_two += 1
+        
+        new_list.append([]) # добавление пустого элемента в новый список для будущих событий
+        for event in block:
+            if event['type'] == 'broken':
+                new_list[0].append(event)
+
+            if event['type'] == 'suitcase_start' and event['object'].package_type == 1 and quantitypackageone != 0:
+                new_list[0].append(event)
+                package_type_one -= 1
+                for i in block:
+                    if i['type'] == 'issue':
+                        new_list[0].append(i)
+                        block.remove(i)
+                    if i['type'] == 'alarm':
+                        new_list[0].append(i)
+                        block.remove(i)
+                    if i['type'] == 'suitcase_finish':
+                        break
+                    
+                for i in block:
+                    if i['type'] == 'suitcase_finish' and i['object'].package_type == 1:
+                        new_list[0].append(i)
+                        block.remove(i)
+                        break
+                for i in block:
+                    if i['type'] == 'receipt' and i['object'].quantitypackageone != 0:
+                        new_list[0].append(i)
+                        quantitypackageone -= 1
+                        break
+                
+            elif event['type'] == 'suitcase_start' and event['object'].package_type == 2 and quantitypackagedouble != 0:
+                new_list[0].append(event)
+                package_type_two -= 1
+                for i in block:
+                    if i['type'] == 'issue':
+                        new_list[0].append(i)
+                        block.remove(i)
+                    if i['type'] == 'alarm':
+                        new_list[0].append(i)
+                        block.remove(i)
+                    if i['type'] == 'suitcase_finish':
+                        break
+                    
+                for i in block:
+                    if i['type'] == 'suitcase_finish' and i['object'].package_type == 2:
+                        new_list[0].append(i)
+                        block.remove(i)
+                        break
+                    
+                for i in block:
+                    if i['type'] == 'receipt' and i['object'].quantitypackagedouble != 0:
+                        new_list[0].append(i)
+                        quantitypackagedouble -= 1
+                        break
+                    
+    device.line_event = new_list
     
     
-# list = [[ [] ], [ [] ], [ [] ]]
 def add_receipt_to_suitcase_broken(device: Device):
     '''
     Присваивание чека каждой упаковке внутри списка "бракованных" упаковок.
+    input: device.broken_line_event
+    
+    output:
+    device.list_receipt_with_suitcase - пары "упаковка(/уведомление)/чек"
+    device.list_receipt_without_suitcase - чеки без пары
     
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     
     
-    package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
-    
     for block in device.broken_line_event:
+        package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
         if block[0]['task_type'] in {'КПУ/КнПУ', 'чек без упаковок', 'смешанные'}:
             device.list_receipt_with_suitcase.append([])
         
@@ -272,14 +356,8 @@ def add_receipt_to_suitcase_broken(device: Device):
                         package_type_one += 1
                     elif event['object'].package_type == 2:
                         package_type_two += 1
-            
-            # quantitypackageone - количество одинарных упаковок в чеке
-            # quantitypackagedouble - количество двойных упаковок в чеке
-            # package_type_one - количество одинарных упаковок
-            # package_type_two - количество двойных упаковок
-            
-            # device.list_receipt_with_suitcase = [ [ [события], [чеки без событий] ], [ [], [] ] ]
-            
+                        
+                        
             for event in block:
                 if event['type'] == 'service':
                     device.list_receipt_with_suitcase[0].append(event)
@@ -331,19 +409,20 @@ def add_receipt_to_suitcase_broken(device: Device):
                     device.list_receipt_without_suitcase.append(event)
 
         print('hello')
-
-
-
-                
-        package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
-    
-    create_csv(device)
+        
+    # for block in device.list_receipt_without_suitcase:
+    #     for event in block:
+    #         print(block)
+    #         import sys
+    #         sys.exit()
+        
+    write_csv_temp(device)
             
 
                  
 def write_csv_temp(device: Device):
     
-    with open('list_receipt_without_suitcase.csv', 'a', encoding='utf-8', newline='') as file:
+    with open('list_receipt_without_suitcase_31.03.csv', 'a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file, delimiter=";")
         writer.writerow((device.name, ''))
         for i in device.list_receipt_without_suitcase:
@@ -381,7 +460,7 @@ def create_csv(device: Device):
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
 
-    with open('list_receipt_with_suitcase.csv', 'a', encoding='utf-8', newline='') as file:
+    with open('list_receipt_without_suitcase_31.03.csv', 'a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file, delimiter=";")
 
         for block in device.list_receipt_with_suitcase:
