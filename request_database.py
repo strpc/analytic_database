@@ -125,18 +125,19 @@ class Suitcase():
     suitcase_finish = ''
     package_type = ''
     receipt_id = int()
+    # receipt_number = ''
 
     def __init__(self,
                  suitcase_id,
                  suitcase_start,
                  suitcase_finish,
-                 package_type,
-                 receipt_id):
+                 package_type):
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.package_type = package_type
-        self.receipt_id = receipt_id
+        self.receipt_id = ""
+        # self.receipt_number = ""
 
     def __str__(self):
         return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
@@ -319,8 +320,7 @@ class Get_request():
             suitcases_list.append(Suitcase(suitcase_id=row['id'],
                                            suitcase_start=row['dateini_local'],
                                            suitcase_finish=row['local_date'],
-                                           package_type=row['package_type'],
-                                           receipt_id=row['receipt_id'])
+                                           package_type=row['package_type'])
                                   )
 
         return suitcases_list.copy()
