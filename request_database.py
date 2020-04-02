@@ -122,18 +122,21 @@ class Suitcase():
     package_type = ''
     receipt_id = ''
     package_type_by_receipt = None
+    polycom_id = ''
 
     def __init__(self,
                  suitcase_id,
                  suitcase_start,
                  suitcase_finish,
-                 package_type):
+                 package_type,
+                 polycom_id):
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.package_type = package_type
         self.receipt_id = ''
         self.package_type_by_receipt = None
+        self.polycom_id = polycom_id
 
     def __str__(self):
         return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
@@ -301,7 +304,7 @@ class Get_request():
         conn = await self.connect()
 
         rows = await conn.fetch(f"\
-        SELECT id, dateini_local, local_date, package_type, receipt_id \
+        SELECT id, dateini_local, local_date, package_type, receipt_id, polycom_id \
         FROM polycomm_suitcase \
         WHERE \
         dateini_local > timestamp '{self.date_start}' and \
@@ -316,7 +319,8 @@ class Get_request():
             suitcases_list.append(Suitcase(suitcase_id=row['id'],
                                            suitcase_start=row['dateini_local'],
                                            suitcase_finish=row['local_date'],
-                                           package_type=row['package_type'])
+                                           package_type=row['package_type'],
+                                           polycom_id=row['polycom_id'])
                                   )
 
         return suitcases_list.copy()
