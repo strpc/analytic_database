@@ -120,8 +120,8 @@ class Suitcase():
     suitcase_start = ''
     suitcase_finish = ''
     package_type = ''
-    receipt_id = int()
-    package_type_by_receipt = int()
+    receipt_id = ''
+    package_type_by_receipt = None
 
     def __init__(self,
                  suitcase_id,
