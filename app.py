@@ -241,13 +241,10 @@ def add_task(device: Device):
         count_alarm = count_issue = count_receipt = count_suitcase_start = 0
         package_type_one = package_type_two = quantitypackageone = quantitypackagedouble = 0
         
-    receipt_event_sync(device)
-    
-    # add_receipt_to_line_event(device)
-    # add_receipt_to_suitcase_broken(device)
+    receipt_broken_line_event_sync(device)
     
     
-def receipt_event_sync(device: Device):
+def receipt_broken_line_event_sync(device: Device):
     '''
     Присваивание чека каждой упаковке событий списка broken_line_event
     
@@ -266,12 +263,14 @@ def receipt_event_sync(device: Device):
                     while len(block) > i:
                         if block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 1 and count_packageone != 0 and block[i+1]['type'] == 'suitcase_finish':
                             block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 1
                             count_packageone -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
                             
                         elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  == 'suitcase_finish':
                             block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 2
                             count_packagedouble -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
@@ -288,12 +287,14 @@ def receipt_event_sync(device: Device):
                     while len(block) > i:
                         if block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 1 and count_packageone != 0 and block[i+1]['type'] != 'suitcase_finish':
                             block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 1
                             count_packageone -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
                         
                         elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  != 'suitcase_finish':
                             block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 2
                             count_packagedouble -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
@@ -304,6 +305,111 @@ def receipt_event_sync(device: Device):
                                 break
                         i += 1
                     
+                    #comment: 
+                    if event['object'].receipt_id == 942446:
+                        print()
+
+                    if count_packageone != 0 or count_packagedouble != 0:
+                        i = 0
+                        while len(block) > i and (count_packageone > 0 or count_packagedouble > 0):
+                            if count_packageone != 0 and block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '':
+                                block[i]['object'].receipt_id = event['object'].receipt_id
+                                block[i]['object'].package_type_by_receipt = 1
+                                count_packageone -= 1
+                                
+                            elif count_packagedouble != 0 and block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '':
+                                block[i]['object'].receipt_id = event['object'].receipt_id
+                                block[i]['object'].package_type_by_receipt = 2
+                                count_packagedouble -= 1
+                            i += 1
+
+
+        for event in block:                
+            if event['type'] == 'suitcase_start' and event['object'].receipt_id == '':
+                event['object'].receipt_id = -1
+
+    receipt_line_event_sync(device)
+    
+    
+    
+def receipt_line_event_sync(device: Device):
+    '''
+    Присваивание чека каждой упаковке событий списка line_event(события без "претензий").
+    
+    :param device: элемент списка экземпляров активных устройств класса Device.
+    '''
+    for block in device.line_event:
+        count_packageone = count_packagedouble = 0
+        for event in block:
+            
+            if event['type'] == 'receipt':
+                count_packageone = event['object'].quantitypackageone
+                count_packagedouble = event['object'].quantitypackagedouble
+
+                i = 0
+                while len(block) > i:
+                    if block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 1 and count_packageone != 0 and block[i+1]['type'] == 'suitcase_finish':
+                        block[i]['object'].receipt_id = event['object'].receipt_id
+                        block[i]['object'].package_type_by_receipt = 1
+                        count_packageone -= 1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                        
+                    elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  == 'suitcase_finish':
+                        block[i]['object'].receipt_id = event['object'].receipt_id
+                        block[i]['object'].package_type_by_receipt = 2
+                        count_packagedouble -= 1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                
+                    elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i+1]['type'] == 'suitcase_finish' and count_packagedouble == 0 and count_packageone == 0:
+                        print(block[i]['type'])
+                        print()
+                        block[i]['object'].receipt_id = -1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                    i += 1
+
+                i = 0
+                while len(block) > i:
+                    if block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 1 and count_packageone != 0 and block[i+1]['type'] != 'suitcase_finish':
+                        block[i]['object'].receipt_id = event['object'].receipt_id
+                        block[i]['object'].package_type_by_receipt = 1
+                        count_packageone -= 1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                    
+                    elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  != 'suitcase_finish':
+                        block[i]['object'].receipt_id = event['object'].receipt_id
+                        block[i]['object'].package_type_by_receipt = 2
+                        count_packagedouble -= 1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                    
+                    elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i+1]['type']  != 'suitcase_finish' and (count_packagedouble == 0 and count_packageone == 0):
+                        block[i]['object'].receipt_id = -1
+                        if count_packageone == count_packagedouble == 0:
+                            break
+                    i += 1
+                
+                #comment: 
+                if event['object'].receipt_id == 942446:
+                    print()
+
+                if count_packageone != 0 or count_packagedouble != 0:
+                    i = 0
+                    while len(block) > i and (count_packageone > 0 or count_packagedouble > 0):
+                        if count_packageone != 0 and block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '':
+                            block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 1
+                            count_packageone -= 1
+                        elif count_packagedouble != 0 and block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '':
+                            block[i]['object'].receipt_id = event['object'].receipt_id
+                            block[i]['object'].package_type_by_receipt = 2
+                            count_packagedouble -= 1
+                        i += 1
+
+
         for event in block:                
             if event['type'] == 'suitcase_start' and event['object'].receipt_id == '':
                 event['object'].receipt_id = -1
@@ -425,31 +531,8 @@ def receipt_event_sync2(device: Device):
                         i += 1
                     break
 
-
     create_csv(device)
 
-
-def write_csv_temp(device: Device):
-    
-    with open('list_receipt_without_suitcase_31.03.csv', 'a', encoding='utf-8', newline='') as file:
-        writer = csv.writer(file, delimiter=";")
-        # writer.writerow((device.name, ''))
-        for i in device.list_receipt_without_suitcase:
-            if i['type'] == 'service':
-                writer.writerow(('', i['task_type']))
-            if i['type'] == 'suitcase_start':
-                writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}"))
-            elif i['type'] == 'suitcase_finish':
-                writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
-
-            elif i['type'] == 'receipt' and i['object'].quantitypackageone > 0:
-                writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ОДИНАРНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackageone}"))
-            elif i['type'] == 'receipt' and i['object'].quantitypackagedouble > 0:
-                writer.writerow(('', i['time'], i['type'], f"ЧИСЛО ДВОЙНЫХ УПАКОВОК В ЧЕКЕ: {i['object'].quantitypackagedouble}"))
-                
-        writer.writerow(('',''))
-    
-    
 
 def view_console(device: Device):
     '''
@@ -485,7 +568,7 @@ def create_csv(device: Device):
                     writer.writerow((i['type'], f"ПРЕВЫШЕНИЕ ПО ВРЕМЕНИ МЕЖДУ УПАКОВКАМИ {TIMEDELTA_CHECK}"))
 
                 elif i['type'] == 'suitcase_start':
-                    writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека {i['object'].receipt_id}"))
+                    writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека: {i['object'].receipt_id}", f"тип чека: {i['object'].package_type_by_receipt}"))
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
 
