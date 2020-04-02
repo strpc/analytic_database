@@ -40,8 +40,6 @@ class Device():
     # service:
     line_event = list()
     broken_line_event = list()
-    list_receipt_with_suitcase = list()
-    list_receipt_without_suitcase = list()
 
     def __init__(self,
                  device_id,
@@ -54,8 +52,6 @@ class Device():
         self.suitcases_list = list()
         self.line_event = list()
         self.broken_line_event = list()
-        self.list_receipt_with_suitcase = list()
-        self.list_receipt_without_suitcase = list()
 
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -125,7 +121,7 @@ class Suitcase():
     suitcase_finish = ''
     package_type = ''
     receipt_id = int()
-    # receipt_number = ''
+    package_type_by_receipt = int()
 
     def __init__(self,
                  suitcase_id,
@@ -136,8 +132,8 @@ class Suitcase():
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.package_type = package_type
-        self.receipt_id = ""
-        # self.receipt_number = ""
+        self.receipt_id = ''
+        self.package_type_by_receipt = None
 
     def __str__(self):
         return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
