@@ -417,7 +417,6 @@ def adding_attributes(device: Device):
                     block[i]['object'].to_account = True
                     block[i]['object'].issue_list['type'] = 7
                     
-                    
                 #КПУ оплаченная
                 elif block[i]['object'].receipt_id not in {-1, None} and block[i+1]['type'] not in {'alarm', 'issue'}:
                     block[i]['object'].csp = True
@@ -480,11 +479,14 @@ def create_csv(device: Device):
                     writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека: {i['object'].receipt_id}", f"тип чека: {i['object'].package_type_by_receipt}", f"polycom_id = {i['object'].polycom_id}"))
                     writer.writerow((f"id: {i['object'].issue_list['id']}",
                                      f"total: {i['object'].issue_list['total']}",
-                                     f"suitcase: {i['object'].issue_list['suitcase']}",
-                                     f"type: {i['object'].issue_list['type']}"))
+                                     f"suitcase: {i['object'].issue_list['suitcase']}"))
                     writer.writerow((f"date: {i['object'].issue_list['date']}",
                                      f"localdate: {i['object'].issue_list['localdate']}",
                                      f"status: {i['object'].issue_list['status']}"))
+                    # print(i['object'].issue_list['type'])
+                    if i['object'].issue_list.get('type'):
+                        print('hello')
+                        writer.writerow((f"type: {i['object'].issue_list['type']}",))
                     
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
