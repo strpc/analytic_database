@@ -89,7 +89,6 @@ class Suitcase():
             'id': '',
             'total': '',
             'suitcase': '',
-            'type': '',
             'date': '',
             'localdate': '',
             'status': '',  
