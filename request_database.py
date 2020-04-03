@@ -1,21 +1,11 @@
-import asyncpg
-
 import asyncio
+
+import asyncpg
 
 
 class Alarm():
     '''Класс, содержащий информацию о уведомлениях'''
-
-    alarm_time = ''
-    alarm_id = int()
-    alarm_device_id = int()
-    alarm_type = ''
-
-    def __init__(self,
-                 alarm_id,
-                 alarm_time,
-                 alarm_device_id,
-                 alarm_type):
+    def __init__(self, alarm_id, alarm_time, alarm_device_id, alarm_type):
         self.alarm_id = alarm_id
         self.alarm_time = alarm_time
         self.alarm_device_id = alarm_device_id
@@ -30,29 +20,15 @@ class Alarm():
 
 class Device():
     '''Класс, содержащий информацию о устройствах для упаковки.'''
-
-    name = str()#
-    device_id = int()#
-    alarm_list = list()  # УВЕДОМЛЕНИЯ
-    issue_list = list()  # ОПОВЕЩЕНИЯ
-    receipts_list = list()  # ЧЕКИ
-    suitcases_list = list()  # УПАКОВКИ
-    # service:
-    line_event = list()
-    broken_line_event = list()
-
-    def __init__(self,
-                 device_id,
-                 name):
+    def __init__(self, device_id, name):
         self.name = name
         self.device_id = device_id
-        self.line_event = list()#
-        self.broken_line_event = list()#
-        
-        # self.alarm_list = list()#
-        # self.issue_list = list()#
-        # self.receipts_list = list()#
-        # self.suitcases_list = list()#
+        self.line_event = list()
+        self.broken_line_event = list()
+        self.alarm_list = list()# УВЕДОМЛЕНИЯ
+        self.issue_list = list() # ОПОВЕЩЕНИЯ
+        self.receipts_list = list() # ЧЕКИ
+        self.suitcases_list = list() # УПАКОВКИ
 
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -63,17 +39,7 @@ class Device():
 
 class Issue():
     '''Класс, содержащий информацию о оповещениях.'''
-
-    # suitcase_id = int()#
-    # issue_time = ''#
-    # issue_device_id = int()#
-    # issue_type = ''#
-
-    def __init__(self,
-                 suitcase_id,
-                 issue_time,
-                 device_id,
-                 issue_type):
+    def __init__(self, suitcase_id, issue_time, device_id, issue_type):
         self.suitcase_id = suitcase_id
         self.issue_time = issue_time
         self.device_id = device_id
@@ -88,19 +54,8 @@ class Issue():
 
 class Receipts():
     '''Класс, содержащий информацию о чеках.'''
-
-    # receipt_id = int()
-    # receipts_timestamp = ''
-    # device_id = int()
-    # quantitypackageone = ''
-    # quantitypackagedouble = ''
-
-    def __init__(self,
-                 receipt_id,
-                 receipts_timestamp,
-                 device_id,
-                 quantitypackageone,
-                 quantitypackagedouble):
+    def __init__(self, receipt_id, receipts_timestamp, device_id, 
+                 quantitypackageone, quantitypackagedouble):
         self.receipt_id = receipt_id
         self.receipts_timestamp = receipts_timestamp
         self.device_id = device_id
@@ -116,46 +71,29 @@ class Receipts():
 
 class Suitcase():
     '''Класс, содержащий информацию о упаковках'''
-
-    # suitcase_id = int()#
-    # suitcase_start = ''#
-    # suitcase_finish = ''#
-    # package_type = ''#
-    # polycom_id = ''#
-    
-    receipt_id = ''
-    package_type_by_receipt = None
-    #attrib for issue:
-    csp = str()
-    unpaid = str()
-    to_account = str()
-    issue_list = {
-        'id': '',
-        'total': '',
-        'suitcase': '',
-        'type': '',
-        'date': '',
-        'localdate': '',
-        'status': '',
-    }
-
-    def __init__(self,
-                 suitcase_id,
-                 suitcase_start,
-                 suitcase_finish,
-                 package_type,
-                 polycom_id,
-                 totalid):
+    def __init__(self, suitcase_id, suitcase_start, suitcase_finish, 
+                 package_type, polycom_id, totalid):
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.package_type = package_type
         self.polycom_id = polycom_id
         self.totalid = totalid
-        
-        # self.receipt_id = ''#
-        # self.package_type_by_receipt = None#
-
+        self.receipt_id = ''
+        self.package_type_by_receipt = None
+        self.csp = str()
+        self.unpaid = str()
+        self.to_account = str()
+        self.issue_list = dict()
+        self.issue_list = {
+            'id': '',
+            'total': '',
+            'suitcase': '',
+            'type': '',
+            'date': '',
+            'localdate': '',
+            'status': '',  
+        }
 
     def __str__(self):
         return f'polycom_id: {self.polycom_id}, package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
@@ -166,14 +104,8 @@ class Suitcase():
 
 class Get_request():
     '''Класс с запросами к базе.'''
-
-    def __init__(self,
-                 pg_user,
-                 pg_password,
-                 pg_host,
-                 pg_db,
-                 date_start,
-                 date_finish):
+    def __init__(self, pg_user, pg_password, pg_host, pg_db, 
+                 date_start, date_finish):
         self.pg_user = pg_user
         self.pg_password = pg_password
         self.pg_host = pg_host
@@ -183,7 +115,6 @@ class Get_request():
 
     async def connect(self):
         '''Создание подключения к базе.'''
-
         conn = await asyncpg.connect(
             f'postgresql://{self.pg_user}:{self.pg_password}@{self.pg_host}/{self.pg_db}')
         return conn
@@ -191,9 +122,7 @@ class Get_request():
     async def get_devices(self):
         '''Получение списка активных устройств упаковки из базы. 
         Создание списка экземпляров классов Device'''
-
         conn = await self.connect()
-
         rows = await conn.fetch('\
             SELECT id, title FROM polycomm_device \
             INNER JOIN timestamps \
@@ -206,7 +135,6 @@ class Get_request():
         devices_list = list()
         for row in rows:
             devices_list.append(Device(device_id=row['id'], name=row['title']))
-
         return devices_list.copy()
 
     async def get_alarm(self, device_id):
@@ -217,9 +145,7 @@ class Get_request():
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
-
         conn = await self.connect()
-
         alarm_list = list()
         rows = await conn.fetch(f"\
             SELECT polycommalarm.id, localdate, device, polycomm_alarm_type.title \
@@ -239,7 +165,6 @@ class Get_request():
                                     alarm_device_id=row['device'],
                                     alarm_type=row['title']
                                     ))
-        # print(*alarm_list)
         return alarm_list.copy()
 
     async def get_issue(self, device_id):
@@ -250,9 +175,7 @@ class Get_request():
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
-
         conn = await self.connect()
-
         rows = await conn.fetch(f"\
             SELECT suitcase, localdate, device, polycomm_issue_type.title \
             FROM polycommissue \
@@ -275,7 +198,6 @@ class Get_request():
 
     async def get_issue_type(self):
         '''Получение id и названий типов оповещений'''
-        
         conn = await self.connect()
         rows = await conn.fetch(f"SELECT id, title from polycomm_issue_type")
         await conn.close()
@@ -283,9 +205,7 @@ class Get_request():
         issue_type = dict()
         for row in rows:
             issue_type[row['id']] = row['title']
-        
         return issue_type
-
 
     async def get_receipts(self, device_id):
         '''
@@ -295,23 +215,16 @@ class Get_request():
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
-
         conn = await self.connect()
-
-        #WORKED: dateopen
         rows = await conn.fetch(f"\
         SELECT DISTINCT receipts.receipt_id, dateclose, polycomm_device.id, receipts.quantitypackageone, receipts.quantitypackagedouble \
         FROM receipts \
         LEFT JOIN polycomm_device on \
-            CAST(receipts.devicecode as int) = polycomm_device.code \
-        WHERE \
-            dateclose > timestamp '{self.date_start}' and \
-            dateclose < timestamp '{self.date_finish}' and \
-            polycomm_device.id = {device_id} \
-        ORDER BY \
-            dateclose \
-        ")
-
+             CAST(receipts.devicecode as int) = polycomm_device.code \
+        WHERE dateclose > timestamp '{self.date_start}' and \
+              dateclose < timestamp '{self.date_finish}' and \
+              polycomm_device.id = {device_id} \
+        ORDER BY dateclose")
         await conn.close()
 
         receipts_list = list()
@@ -334,9 +247,7 @@ class Get_request():
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
-
         conn = await self.connect()
-
         rows = await conn.fetch(f"\
         SELECT id, dateini_local, local_date, package_type, receipt_id, polycom_id, totalid \
         FROM polycomm_suitcase \
@@ -344,8 +255,7 @@ class Get_request():
         dateini_local > timestamp '{self.date_start}' and \
         dateini_local < timestamp '{self.date_finish}' and \
         device_id = {device_id} \
-        order by dateini_local;")
-
+        ORDER BY dateini_local;")
         await conn.close()
 
         suitcases_list = list()
@@ -357,26 +267,4 @@ class Get_request():
                                            polycom_id=row['polycom_id'],
                                            totalid=row['totalid'])
                                   )
-
         return suitcases_list.copy()
-    
-
-# async def run(request):
-#     receipts_list = await request.get_receipts(132)
-#     for i in receipts_list:
-#         print(i.receipt_id)
-
-
-
-# if __name__ == '__main__':
-#     from config import *
-    
-#     request = Get_request(pg_user=PG_USER,
-#                         pg_password=PG_PASSWORD,
-#                         pg_host=PG_HOST,
-#                         pg_db=PG_DB,
-#                         date_start=DATE_START,
-#                         date_finish=DATE_FINISH
-#                         )
-    
-#     asyncio.run(run(request))
