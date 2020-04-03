@@ -31,8 +31,8 @@ class Alarm():
 class Device():
     '''Класс, содержащий информацию о устройствах для упаковки.'''
 
-    name = str()
-    device_id = int()
+    name = str()#
+    device_id = int()#
     alarm_list = list()  # УВЕДОМЛЕНИЯ
     issue_list = list()  # ОПОВЕЩЕНИЯ
     receipts_list = list()  # ЧЕКИ
@@ -46,12 +46,13 @@ class Device():
                  name):
         self.name = name
         self.device_id = device_id
-        self.alarm_list = list()
-        self.issue_list = list()
-        self.receipts_list = list()
-        self.suitcases_list = list()
-        self.line_event = list()
-        self.broken_line_event = list()
+        self.line_event = list()#
+        self.broken_line_event = list()#
+        
+        # self.alarm_list = list()#
+        # self.issue_list = list()#
+        # self.receipts_list = list()#
+        # self.suitcases_list = list()#
 
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -63,10 +64,10 @@ class Device():
 class Issue():
     '''Класс, содержащий информацию о оповещениях.'''
 
-    suitcase_id = int()
-    issue_time = ''
-    issue_device_id = int()
-    issue_type = ''
+    # suitcase_id = int()#
+    # issue_time = ''#
+    # issue_device_id = int()#
+    # issue_type = ''#
 
     def __init__(self,
                  suitcase_id,
@@ -83,16 +84,16 @@ class Issue():
 
     def __repr__(self):
         return f'{self.issue_type}'
-
+    
 
 class Receipts():
     '''Класс, содержащий информацию о чеках.'''
 
-    receipt_id = int()
-    receipts_timestamp = ''
-    device_id = int()
-    quantitypackageone = ''
-    quantitypackagedouble = ''
+    # receipt_id = int()
+    # receipts_timestamp = ''
+    # device_id = int()
+    # quantitypackageone = ''
+    # quantitypackagedouble = ''
 
     def __init__(self,
                  receipt_id,
@@ -116,33 +117,51 @@ class Receipts():
 class Suitcase():
     '''Класс, содержащий информацию о упаковках'''
 
-    suitcase_id = int()
-    suitcase_start = ''
-    suitcase_finish = ''
-    package_type = ''
+    # suitcase_id = int()#
+    # suitcase_start = ''#
+    # suitcase_finish = ''#
+    # package_type = ''#
+    # polycom_id = ''#
+    
     receipt_id = ''
     package_type_by_receipt = None
-    polycom_id = ''
+    #attrib for issue:
+    csp = str()
+    unpaid = str()
+    to_account = str()
+    issue_list = {
+        'id': '',
+        'total': '',
+        'suitcase': '',
+        'type': '',
+        'date': '',
+        'localdate': '',
+        'status': '',
+    }
 
     def __init__(self,
                  suitcase_id,
                  suitcase_start,
                  suitcase_finish,
                  package_type,
-                 polycom_id):
+                 polycom_id,
+                 totalid):
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
         self.suitcase_finish = suitcase_finish
         self.package_type = package_type
-        self.receipt_id = ''
-        self.package_type_by_receipt = None
         self.polycom_id = polycom_id
+        self.totalid = totalid
+        
+        # self.receipt_id = ''#
+        # self.package_type_by_receipt = None#
+
 
     def __str__(self):
-        return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
+        return f'polycom_id: {self.polycom_id}, package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
 
     def __repr__(self):
-        return f'package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
+        return f'polycom_id: {self.polycom_id}, package_type suitcase: {self.package_type}, suitcase_start: {self.suitcase_start}'
 
 
 class Get_request():
@@ -254,6 +273,20 @@ class Get_request():
                                     issue_type=row['title']))
         return issue_list.copy()
 
+    async def get_issue_type(self):
+        '''Получение id и названий типов оповещений'''
+        
+        conn = await self.connect()
+        rows = await conn.fetch(f"SELECT id, title from polycomm_issue_type")
+        await conn.close()
+        
+        issue_type = dict()
+        for row in rows:
+            issue_type[row['id']] = row['title']
+        
+        return issue_type
+
+
     async def get_receipts(self, device_id):
         '''
         Получение чеков из базы. 
@@ -267,14 +300,14 @@ class Get_request():
 
         #WORKED: dateopen
         rows = await conn.fetch(f"\
-        SELECT DISTINCT receipts.receipt_id, dateclose, device_id, receipts.quantitypackageone, receipts.quantitypackagedouble \
+        SELECT DISTINCT receipts.receipt_id, dateclose, polycomm_device.id, receipts.quantitypackageone, receipts.quantitypackagedouble \
         FROM receipts \
-        LEFT JOIN polycomm_suitcase on \
-            receipts.receipt_id = polycomm_suitcase.receipt_id \
+        LEFT JOIN polycomm_device on \
+            CAST(receipts.devicecode as int) = polycomm_device.code \
         WHERE \
             dateclose > timestamp '{self.date_start}' and \
             dateclose < timestamp '{self.date_finish}' and \
-            device_id = {device_id} \
+            polycomm_device.id = {device_id} \
         ORDER BY \
             dateclose \
         ")
@@ -285,14 +318,15 @@ class Get_request():
         for row in rows:
             receipts_list.append(Receipts(receipt_id=row['receipt_id'],
                                           receipts_timestamp=row['dateclose'],
-                                          device_id=row['device_id'],
+                                          device_id=row['id'],
                                           quantitypackageone=row['quantitypackageone'],
                                           quantitypackagedouble=row['quantitypackagedouble']
                                           )
                                  )
         return receipts_list.copy()
+    
 
-    async def get_suitcases(self, device_id  ):
+    async def get_suitcases(self, device_id):
         '''
         Получение упаковок из базы. 
         Создание списка экземпляров классов Suitcase
@@ -304,7 +338,7 @@ class Get_request():
         conn = await self.connect()
 
         rows = await conn.fetch(f"\
-        SELECT id, dateini_local, local_date, package_type, receipt_id, polycom_id \
+        SELECT id, dateini_local, local_date, package_type, receipt_id, polycom_id, totalid \
         FROM polycomm_suitcase \
         WHERE \
         dateini_local > timestamp '{self.date_start}' and \
@@ -320,7 +354,29 @@ class Get_request():
                                            suitcase_start=row['dateini_local'],
                                            suitcase_finish=row['local_date'],
                                            package_type=row['package_type'],
-                                           polycom_id=row['polycom_id'])
+                                           polycom_id=row['polycom_id'],
+                                           totalid=row['totalid'])
                                   )
 
         return suitcases_list.copy()
+    
+
+# async def run(request):
+#     receipts_list = await request.get_receipts(132)
+#     for i in receipts_list:
+#         print(i.receipt_id)
+
+
+
+# if __name__ == '__main__':
+#     from config import *
+    
+#     request = Get_request(pg_user=PG_USER,
+#                         pg_password=PG_PASSWORD,
+#                         pg_host=PG_HOST,
+#                         pg_db=PG_DB,
+#                         date_start=DATE_START,
+#                         date_finish=DATE_FINISH
+#                         )
+    
+#     asyncio.run(run(request))
