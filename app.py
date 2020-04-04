@@ -216,7 +216,7 @@ def add_task(device: Device):
         elif count_receipt != 0 and count_issue == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
         
-        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone >= package_type_one or quantitypackagedouble >= package_type_two): #FIXME:
+        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone >= package_type_one and quantitypackageone != 0 or quantitypackagedouble >= package_type_two and quantitypackagedouble != 0):
             block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
 
         elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
@@ -479,10 +479,8 @@ def create_csv(device: Device):
                     writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека: {i['object'].receipt_id}", f"тип чека: {i['object'].package_type_by_receipt}", f"polycom_id = {i['object'].polycom_id}"))
                     writer.writerow((f"id: {i['object'].issue_list['id']}",
                                      f"total: {i['object'].issue_list['total']}",
-                                     f"suitcase: {i['object'].issue_list['suitcase']}"))
-                    writer.writerow((f"date: {i['object'].issue_list['date']}",
-                                     f"localdate: {i['object'].issue_list['localdate']}",
-                                     f"status: {i['object'].issue_list['status']}"))
+                                     f"suitcase: {i['object'].issue_list['suitcase']}",f"date: {i['object'].issue_list['date']}",
+                                     f"localdate: {i['object'].issue_list['localdate']}"))
                     # print(i['object'].issue_list['type'])
                     if i['object'].issue_list.get('type'):
                         print('hello')
