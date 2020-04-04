@@ -91,7 +91,6 @@ class Suitcase():
             'suitcase': '',
             'date': '',
             'localdate': '',
-            'status': '',  
         }
 
     def __str__(self):
