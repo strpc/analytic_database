@@ -84,7 +84,6 @@ class Suitcase():
         self.csp = str()
         self.unpaid = str()
         self.to_account = str()
-        self.issue_list = dict()
         self.issue_list = {
             'id': '',
             'total': '',
