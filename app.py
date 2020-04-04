@@ -202,7 +202,6 @@ def add_task(device: Device):
                     quantitypackageone += event['object'].quantitypackageone
                 if event['object'].quantitypackagedouble > 0:
                     quantitypackagedouble += event['object'].quantitypackagedouble
-            
             elif event['type'] == 'suitcase_start':
                 count_suitcase_start += 1
                 if event['object'].package_type == 1:
@@ -213,16 +212,16 @@ def add_task(device: Device):
         if count_issue != 0 and count_receipt == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
         
-        elif count_receipt != 0 and count_issue == count_suitcase_start == 0:
+        elif count_receipt != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
         
-        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone >= package_type_one and quantitypackageone != 0 or quantitypackagedouble >= package_type_two and quantitypackagedouble != 0):
+        elif count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone >= package_type_one and quantitypackageone != 0 and quantitypackagedouble >= package_type_two and quantitypackagedouble != 0:
             block.insert(0, {'task_type': 'чек без упаковок', 'type': 'service'})
 
         elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чеки без упаковок и уведомление', 'type': 'service'}) 
         
-        elif count_suitcase_start != 0 and count_receipt != 0 and count_issue == 0 and (quantitypackageone <= package_type_one or quantitypackagedouble <= package_type_two):
+        elif count_suitcase_start != 0 and count_receipt == 0 or count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone <= package_type_one and quantitypackagedouble <= package_type_two:
             block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'})
         
         else:
@@ -265,8 +264,6 @@ def receipt_broken_line_event_sync(device: Device):
                                 break
                     
                         elif block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i-1]['type'] == 'suitcase_start' and count_packagedouble == 0 and count_packageone == 0:
-                            print(block[i]['type'])
-                            print()
                             block[i]['object'].receipt_id = -1
                             if count_packageone == count_packagedouble == 0:
                                 break
@@ -345,8 +342,6 @@ def receipt_line_event_sync(device: Device):
                             break
                 
                     elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i+1]['type'] == 'suitcase_finish' and count_packagedouble == 0 and count_packageone == 0:
-                        print(block[i]['type'])
-                        print()
                         block[i]['object'].receipt_id = -1
                         if count_packageone == count_packagedouble == 0:
                             break
@@ -399,16 +394,20 @@ def adding_attributes(device: Device):
     
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
+    def add_template(event):
+        event['object'].issue_list['id'] = 22222222
+        event['object'].issue_list['total'] = event['object'].totalid
+        event['object'].issue_list['suitcase'] = event['object'].polycom_id
+        event['object'].issue_list['date'] = event['object'].suitcase_finish
+        event['object'].issue_list['localdate'] = event['object'].suitcase_finish
+    
+    
+    
     for block in device.broken_line_event:
 
         i = 0
         while len(block) > i:
             if block[i]['type'] == 'suitcase_start':
-                block[i]['object'].issue_list['id'] = 22222222
-                block[i]['object'].issue_list['total'] = block[i]['object'].totalid
-                block[i]['object'].issue_list['suitcase'] = block[i]['object'].polycom_id
-                block[i]['object'].issue_list['date'] = block[i]['object'].suitcase_finish
-                block[i]['object'].issue_list['localdate'] = block[i]['object'].suitcase_finish
 
                  # КПУ неоплаченная:
                 if block[i]['object'].receipt_id == -1 and block[i+1]['type'] not in {'alarm', 'issue'}:
@@ -416,6 +415,7 @@ def adding_attributes(device: Device):
                     block[i]['object'].unpaid = True
                     block[i]['object'].to_account = True
                     block[i]['object'].issue_list['type'] = 7
+                    add_template(block[i])
                     
                 #КПУ оплаченная
                 elif block[i]['object'].receipt_id not in {-1, None} and block[i+1]['type'] not in {'alarm', 'issue'}:
@@ -425,9 +425,12 @@ def adding_attributes(device: Device):
                     
                     if block[i]['object'].package_type_by_receipt == 1 and block[i]['object'].package_type == 2:
                         block[i]['object'].issue_list['type'] = 8
+                        add_template(block[i])
                         
                     elif block[i]['object'].package_type_by_receipt == 2 and block[i]['object'].package_type == 1:
                         block[i]['object'].issue_list['type'] = 9
+                        add_template(block[i])
+
                 
                 elif block[i+1]['type'] in {'alarm', 'issue'}:
                     if block[i]['object'].receipt_id == -1:  #КнПУ и неоплаченная
@@ -437,6 +440,7 @@ def adding_attributes(device: Device):
                         
                     
                     elif block[i]['object'].receipt_id != -1:  #КПУ оплаченная
+                        
                         block[i]['object'].csp = True
                         block[i]['object'].unpaid = False
                         block[i]['object'].to_account = True
@@ -444,9 +448,11 @@ def adding_attributes(device: Device):
                         
                         if block[i]['object'].package_type == 2 and block[i]['object'].package_type_by_receipt == 1:
                             block[i]['object'].issue_list['type'] = 8
+                            add_template(block[i])
 
                         elif block[i]['object'].package_type == 1 and block[i]['object'].package_type_by_receipt == 2:
                             block[i]['object'].issue_list['type'] = 9
+                            add_template(block[i])
                 # print(block[i]['object'].issue_list['type'], block[i]['object'], block[i]['object'].csp, block[i]['object'].unpaid, block[i]['object'].to_account)
             i += 1
     create_csv(device)
@@ -477,14 +483,17 @@ def create_csv(device: Device):
 
                 elif i['type'] == 'suitcase_start':
                     writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека: {i['object'].receipt_id}", f"тип чека: {i['object'].package_type_by_receipt}", f"polycom_id = {i['object'].polycom_id}"))
-                    writer.writerow((f"id: {i['object'].issue_list['id']}",
-                                     f"total: {i['object'].issue_list['total']}",
-                                     f"suitcase: {i['object'].issue_list['suitcase']}",f"date: {i['object'].issue_list['date']}",
-                                     f"localdate: {i['object'].issue_list['localdate']}"))
-                    # print(i['object'].issue_list['type'])
-                    if i['object'].issue_list.get('type'):
-                        print('hello')
+                    if i['object'].issue_list.get('id'):
+                        writer.writerow((f"id: {i['object'].issue_list['id']}",
+                                        f"total: {i['object'].issue_list['total']}",
+                                        f"suitcase: {i['object'].issue_list['suitcase']}",f"date: {i['object'].issue_list['date']}",
+                                        f"localdate: {i['object'].issue_list['localdate']}"))
                         writer.writerow((f"type: {i['object'].issue_list['type']}",))
+                    
+                    writer.writerow((f"csp: {i['object'].csp}",
+                                    f"unpaid: {i['object'].unpaid}",
+                                    f"to_account: {i['object'].to_account}"))
+
                     
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
@@ -497,8 +506,8 @@ def create_csv(device: Device):
                 elif i['type'] == 'issue':
                     writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
                     
-                # elif i['type'] == 'alarm':
-                #     writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
+                elif i['type'] == 'alarm':
+                    writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
             writer.writerow('')
 
 
