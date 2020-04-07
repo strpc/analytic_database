@@ -8,7 +8,7 @@ import csv
 import logging
 from datetime import timedelta
 
-from request_database import Get_request, Device
+from request_database import Request, Device
 from config import (PG_USER,
                     PG_PASSWORD,
                     PG_HOST,
@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.DEBUG,
                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-async def run_app(request: Get_request):
+async def run_app(request:Request):
     '''
     Получение списка устройств для упаковок, типов оповещений, событий к ним,
     добавление всех событий в список словарей. Сортировка словаря.
@@ -43,40 +43,40 @@ async def run_app(request: Get_request):
                 {'time': alarm.alarm_time,
                  'object': alarm,
                  'type': 'alarm'
-                 }
+                }
             )
         for issue in device.issue_list:
             device.line_event.append(
                 {'time': issue.issue_time,
                  'object': issue,
                  'type': 'issue'
-                 }
+                }
             )
         for receipt in device.receipts_list:
             device.line_event.append(
                 {'time': receipt.receipts_timestamp,
                  'object': receipt,
                  'type': 'receipt'
-                 }
+                }
             )
         for suitcase in device.suitcases_list:
             device.line_event.append(
                 {'time': suitcase.suitcase_start,
                  'object': suitcase,
                  'type': 'suitcase_start'
-                 }
+                }
             )
             device.line_event.append(
                 {'time': suitcase.suitcase_finish,
                  'object': suitcase,
                  'type': 'suitcase_finish'
-                 }
+                }
             )
         device.line_event.sort(key=lambda d: d['time'])
         sort_receipts(device)
 
 
-def sort_receipts(device: Device):
+def sort_receipts(device:Device):
     '''
     Правка событий по признаку "чек после упаковки".
     
@@ -105,7 +105,7 @@ def sort_receipts(device: Device):
     grouping_events(device)
 
 
-def grouping_events(device: Device):
+def grouping_events(device:Device):
     '''
     Группировка событий по признаку "полный цикл". Добавление события "none"
     после каждого полного цикла упаковки. Проверка на время между упаковками
@@ -122,10 +122,12 @@ def grouping_events(device: Device):
             elif device.line_event[i]['type'] != 'none' and device.line_event[i+1]['time'] - device.line_event[i]['time'] > timedelta(seconds=TIMEDELTA_CHECK):
                 device.line_event.insert(i+1, {"type": "none", "ДРОБЛЕНИЕ ПО ПРИЗНАКУ": "ВРЕМЯ"})
         i += 1
-    listing_events(device)
+    for i in device.line_event:
+        print(i)
+    # listing_events(device)
 
 
-def listing_events(device: Device):
+def listing_events(device:Device):
     '''
     Создание списка списков словарей. Каждый элемент главного списка - это
     список, который содержит в себе n-элементов словарей событий полного
@@ -150,7 +152,7 @@ def listing_events(device: Device):
     check_broked_events(device)
 
 
-def check_broked_events(device: Device):
+def check_broked_events(device:Device):
     '''
     Проверка упаковок на наличие чеков к ним
     device.broken_line_event - список бракованных упаковок.
@@ -176,7 +178,7 @@ def check_broked_events(device: Device):
     add_task(device)
 
 
-def add_task(device: Device):
+def add_task(device:Device):
     '''
     Добавления типа задачи:
     оповещение, чек без упаковок, чеки без упаковок и уведомление, 
@@ -232,7 +234,7 @@ def add_task(device: Device):
     receipt_broken_line_event_sync(device)
     
     
-def receipt_broken_line_event_sync(device: Device):
+def receipt_broken_line_event_sync(device:Device):
     '''
     Присваивание чека каждой упаковке событий списка broken_line_event
     
@@ -311,7 +313,7 @@ def receipt_broken_line_event_sync(device: Device):
     receipt_line_event_sync(device)
 
 
-def receipt_line_event_sync(device: Device):
+def receipt_line_event_sync(device:Device):
     '''
     Присваивание чека каждой упаковке событий списка line_event(события без "претензий").
     
@@ -388,7 +390,7 @@ def receipt_line_event_sync(device: Device):
     adding_attributes(device)
 
 
-def adding_attributes(device: Device):
+def adding_attributes(device:Device):
     '''
     Добавление аттрибутов для будущих уведомлений
     
@@ -453,15 +455,28 @@ def adding_attributes(device: Device):
                         elif block[i]['object'].package_type == 1 and block[i]['object'].package_type_by_receipt == 2:
                             block[i]['object'].issue_list['type'] = 9
                             add_template(block[i])
-                # print(block[i]['object'].issue_list['type'], block[i]['object'], block[i]['object'].csp, block[i]['object'].unpaid, block[i]['object'].to_account)
             i += 1
-    create_csv(device)
+    asyncio.gather(update_database(device))
+
+
+async def update_database(device:Device):
+    '''
+    
+    '''
+    for block in device.broken_line_event:
+        for event in block:
+            if event['type'] == 'suitcase_start' and \
+                event['object'].issue_list.get('type') in {7, 8, 9}:
+                await request.create_polycommissue_event(event['object'])
+                event['object'].status = 1
+            elif event['type'] in {'alarm', 'issue'}:
+                event['object'].status = 1
+            elif event['type'] == 'receipt':
+                pass
                 
-    
 
-    
 
-def create_csv(device: Device):
+def create_csv(device:Device):
     '''
     Cоздание CSV-файла с данными.
     
@@ -512,13 +527,13 @@ def create_csv(device: Device):
 
 
 if __name__ == '__main__':
-    request = Get_request(pg_user=PG_USER,
-                          pg_password=PG_PASSWORD,
-                          pg_host=PG_HOST,
-                          pg_db=PG_DB,
-                          date_start=DATE_START,
-                          date_finish=DATE_FINISH
-                          )
+    request = Request(pg_user=PG_USER,
+                      pg_password=PG_PASSWORD,
+                      pg_host=PG_HOST,
+                      pg_db=PG_DB,
+                      date_start=DATE_START,
+                      date_finish=DATE_FINISH
+                      )
 
     from time import time
     t1 = time()
