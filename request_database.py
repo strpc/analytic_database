@@ -32,6 +32,14 @@ class Device():
         self.issue_list = list() # ОПОВЕЩЕНИЯ
         self.receipts_list = list() # ЧЕКИ
         self.suitcases_list = list() # УПАКОВКИ
+        self.task_type = {
+            'уведомление': 1,
+            'чек без упаковки': 2,
+            'смешанные': 5,
+            'КПУ/КнПУ': 4,
+            'чеки без упаковок и уведомления': 3,
+            'Работа двигателя без упаковок Polycomm': 6,
+            }
 
     def __repr__(self):
         return f'{self.device_id}, {self.name}, {self.receipts}'
@@ -42,12 +50,14 @@ class Device():
 
 class Issue():
     '''Класс, содержащий информацию о оповещениях.'''
-    def __init__(self, suitcase_id, issue_time, device_id, issue_type, status):
+    def __init__(self, suitcase_id, issue_time, device_id, issue_type, status,
+                 polycommissue_id):
         self.suitcase_id = suitcase_id
         self.issue_time = issue_time
         self.device_id = device_id
         self.issue_type = issue_type
         self.status = status
+        self.polycommissue_id = polycommissue_id
 
     def __str__(self):
         return f'{self.issue_type}'
@@ -59,13 +69,17 @@ class Issue():
 class Receipts():
     '''Класс, содержащий информацию о чеках.'''
     def __init__(self, receipt_id, receipts_timestamp, device_id, 
-                 quantitypackageone, quantitypackagedouble, status):
+                 quantitypackageone, quantitypackagedouble, status,
+                 dateclosemoscow):
         self.receipt_id = receipt_id
         self.receipts_timestamp = receipts_timestamp
         self.device_id = device_id
         self.quantitypackageone = quantitypackageone
         self.quantitypackagedouble = quantitypackagedouble
+        self.count_packageone = quantitypackageone
+        self.count_packagedouble = quantitypackagedouble
         self.status = status
+        self.dateclosemoscow = dateclosemoscow
 
     def __str__(self):
         return f'quantitypackageone: {self.quantitypackageone}'
@@ -188,7 +202,8 @@ class Request():
         '''
         conn = await self._connect_database()
         rows = await conn.fetch(f"\
-            SELECT suitcase, localdate, device, polycomm_issue_type.title, status \
+            SELECT suitcase, localdate, device, polycomm_issue_type.title, \
+                status, polycommissue_id \
             FROM polycommissue \
             INNER JOIN polycomm_issue_type ON \
                 polycommissue.type = polycomm_issue_type.id \
@@ -203,22 +218,23 @@ class Request():
         for row in rows:
             if row['status'] == 0:
                 issue_list.append(Issue(suitcase_id=row['suitcase'],
-                                        issue_time=row['localdate'],
-                                        device_id=row['device'],
-                                        issue_type=row['title'],
-                                        status=row['status']))
+                                    issue_time=row['localdate'],
+                                    device_id=row['device'],
+                                    issue_type=row['title'],
+                                    status=row['status'],
+                                    polycommissue_id=row['polycommissue_id']))
         return issue_list.copy()
 
-    async def get_issue_type(self):
-        '''Получение id и названий типов оповещений'''
-        conn = await self._connect_database()
-        rows = await conn.fetch(f"SELECT id, title from polycomm_issue_type")
-        await conn.close()
+    # async def get_task_type(self):
+    #     '''Получение id и названий типов задач'''
+    #     conn = await self._connect_database()
+    #     rows = await conn.fetch(f"SELECT task_type_id, title from task_type")
+    #     await conn.close()
         
-        issue_type = dict()
-        for row in rows:
-            issue_type[row['id']] = row['title']
-        return issue_type
+    #     task_type = dict()
+    #     for row in rows:
+    #         task_type[row['task_type_id']] = row['title']
+    #     return task_type
 
     async def get_receipts(self, device_id):
         '''
@@ -232,7 +248,7 @@ class Request():
         rows = await conn.fetch(f"\
         SELECT DISTINCT receipts.receipt_id, dateclose, polycomm_device.id, \
             receipts.quantitypackageone, receipts.quantitypackagedouble, \
-            receipts.status \
+            receipts.status, receipts.dateclosemoscow \
         FROM receipts \
         LEFT JOIN polycomm_device on \
              CAST(receipts.devicecode as int) = polycomm_device.code \
@@ -251,7 +267,8 @@ class Request():
                             device_id=row['id'],
                             quantitypackageone=row['quantitypackageone'],
                             quantitypackagedouble=row['quantitypackagedouble'],
-                            status=row['status']))
+                            status=row['status'],
+                            dateclosemoscow=row['dateclosemoscow']))
         return receipts_list.copy()
     
 
@@ -265,7 +282,7 @@ class Request():
         '''
         conn = await self._connect_database()
         rows = await conn.fetch(f"\
-        SELECT id, dateini_local, local_date, package_type, receipt_id \
+        SELECT id, dateini_local, local_date, package_type, receipt_id, \
             polycom_id, totalid, status, duration \
         FROM polycomm_suitcase \
         WHERE \
@@ -310,7 +327,7 @@ class Request():
                                   type, \
                                   date, \
                                   createtime) \
-        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);",
             event.issue_list['id'],
             event.issue_list['localdate'],
             event.device_id,
@@ -320,40 +337,57 @@ class Request():
             event.issue_list['type'],
             event.issue_list['date'],
             datetime.now())
+        await conn.close()
+    
+    
+    async def create_task(self, to_task):
+        '''
+        Создание записи в таблице task.
         
-
-
-    # a) id
-    # b) localdate
-    # c) device
-    # d) total
-    # e) suitcase
-    # f) duration
-    # g) type
-    # h) date
-    # i) createtime
-
-
-    # id               bigint not null,
-    # guid             text,
-    # localdate        timestamp,
-    # device           bigint,
-    # total            integer,
-    # resolved         boolean,
-    # comment          text,
-    # pid_did          integer,
-    # suitcase         bigint,
-    # duration         integer,
-    # type             bigint,
-    # packer_error     boolean,
-    # starttime        timestamp,
-    # endtime          timestamp,
-    # responsible      bigint,
-    # createtime       timestamp,
-    # video            bigint,
-    # date             timestamp,
-    # videorequesttime timestamp,
-    # videostatus      bigint,
-    # prevsuitcase     bigint,
-    # callback         boolean default false,
-    # status           integer default 0
+        :param to_task: - словарь с нужными для записи в таблицу данными.
+        '''
+        # conn = await self._connect_database() #control_db
+        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        task_id = await conn.fetchval("\
+        INSERT INTO task(date, \
+                        local_date, \
+                        device_id, \
+                        type) \
+        VALUES($1, $2, $3, $4)\
+        RETURNING id;",
+            to_task['date'],
+            to_task['local_date'],
+            to_task['device_id'],
+            to_task['type']
+            )
+        await conn.close()
+        return task_id
+        
+        
+    async def create_task_to_event(self, to_task_event):
+        '''
+        Создание записи в таблице task_to_event.
+        
+        :param to_task_event: - словарь с нужными для записи в таблицу данными.
+        '''
+        # conn = await self._connect_database() #control_db
+        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        parent_id = await conn.fetchval("\
+        INSERT INTO task_to_event(event_id, \
+                                  table_name, \
+                                  ord, \
+                                  parent_id, \
+                                  created_date, \
+                                  task_id) \
+        VALUES($1, $2, $3, $4, $5, $6)\
+        RETURNING id;",
+            to_task_event['event_id'],
+            to_task_event['table_name'],
+            to_task_event['ord'],
+            to_task_event['parent_id'],
+            datetime.now(),
+            to_task_event['task_id']
+            )
+        await conn.close()
+        return parent_id
+        
