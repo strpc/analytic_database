@@ -466,7 +466,9 @@ def adding_attributes(device:Device):
 
 async def update_database(device:Device):
     '''
+    Генерирование информации для будущих записей в бд, создание записей в бд.
     
+    :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     for block in device.broken_line_event:
         to_task = {
@@ -481,7 +483,7 @@ async def update_database(device:Device):
             'ord': 0,
             'parent_id': None,
             'created_date': '',
-            'task_id': ''
+            'task_id': None
         }
         count = 1
         i = 0
@@ -529,7 +531,7 @@ async def update_database(device:Device):
                 to_task_event['ord'] += 1
                 
             elif event['type'] == 'alarm':
-                to_task_event['event_id'] = event['object'].alarm_id
+                to_task_event['event_id'] = event['object'].polycommalarm_id
                 to_task_event['table_name'] = 'polycommalarm'
                 to_task_event['ord'] += 1
                 
@@ -540,6 +542,9 @@ async def update_database(device:Device):
                 
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
+            await request.update_status(event=event)
+        await request.update_status(task_id=to_task_event['task_id'])
+            # update task по to_task_event['task_id'] status = 1
 
         
         
