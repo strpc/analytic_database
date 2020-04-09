@@ -6,9 +6,9 @@ import asyncpg
 
 class Alarm():
     '''Класс, содержащий информацию о уведомлениях'''
-    def __init__(self, alarm_id, alarm_time, 
+    def __init__(self, polycommalarm_id, alarm_time, 
                  alarm_device_id, alarm_type, status):
-        self.alarm_id = alarm_id
+        self.polycommalarm_id = polycommalarm_id
         self.alarm_time = alarm_time
         self.alarm_device_id = alarm_device_id
         self.alarm_type = alarm_type
@@ -170,7 +170,7 @@ class Request():
         conn = await self._connect_database()
         alarm_list = list()
         rows = await conn.fetch(f"\
-            SELECT polycommalarm.id, localdate, device, \
+            SELECT polycommalarm_id, localdate, device, \
                 polycomm_alarm_type.title, polycommalarm.status \
             FROM polycommalarm \
             INNER JOIN polycomm_alarm_type ON \
@@ -178,18 +178,19 @@ class Request():
             WHERE localdate > timestamp '{self.date_start}' \
                 and localdate < timestamp '{self.date_finish}' \
                 and device = {device_id} \
+                and status = 0 \
             ORDER BY localdate \
             ")
         await conn.close()
 
         for row in rows:
-            if row['status'] == 0:
-                alarm_list.append(Alarm(alarm_id=row['id'],
-                                        alarm_time=row['localdate'],
-                                        alarm_device_id=row['device'],
-                                        alarm_type=row['title'],
-                                        status=row['status']
-                                        ))
+            alarm_list.append(Alarm(
+                polycommalarm_id=row['polycommalarm_id'],
+                alarm_time=row['localdate'],
+                alarm_device_id=row['device'],
+                alarm_type=row['title'],
+                status=row['status']
+                                    ))
         return alarm_list.copy()
 
     async def get_issue(self, device_id):
@@ -210,19 +211,19 @@ class Request():
             WHERE localdate > timestamp '{self.date_start}' \
                 and localdate < timestamp '{self.date_finish}' \
                 and device = {device_id} \
+                and status = 0 \
             ORDER BY localdate \
             ")
         await conn.close()
 
         issue_list = list()
         for row in rows:
-            if row['status'] == 0:
-                issue_list.append(Issue(suitcase_id=row['suitcase'],
-                                    issue_time=row['localdate'],
-                                    device_id=row['device'],
-                                    issue_type=row['title'],
-                                    status=row['status'],
-                                    polycommissue_id=row['polycommissue_id']))
+            issue_list.append(Issue(suitcase_id=row['suitcase'],
+                                issue_time=row['localdate'],
+                                device_id=row['device'],
+                                issue_type=row['title'],
+                                status=row['status'],
+                                polycommissue_id=row['polycommissue_id']))
         return issue_list.copy()
 
     # async def get_task_type(self):
@@ -252,17 +253,16 @@ class Request():
         FROM receipts \
         LEFT JOIN polycomm_device on \
              CAST(receipts.devicecode as int) = polycomm_device.code \
-        WHERE dateclose > timestamp '{self.date_start}' and \
-              dateclose < timestamp '{self.date_finish}' and \
-              polycomm_device.id = {device_id} \
+        WHERE dateclose > timestamp '{self.date_start}' \
+            and dateclose < timestamp '{self.date_finish}' \
+            and polycomm_device.id = {device_id} \
+            and status = 0 \
         ORDER BY dateclose")
         await conn.close()
 
         receipts_list = list()
         for row in rows:
-            if row['status'] == 0:
-                receipts_list.append(Receipts(
-                            receipt_id=row['receipt_id'],
+            receipts_list.append(Receipts(receipt_id=row['receipt_id'],
                             receipts_timestamp=row['dateclose'],
                             device_id=row['id'],
                             quantitypackageone=row['quantitypackageone'],
@@ -286,25 +286,25 @@ class Request():
             polycom_id, totalid, status, duration \
         FROM polycomm_suitcase \
         WHERE \
-            dateini_local > timestamp '{self.date_start}' and \
-            dateini_local < timestamp '{self.date_finish}' and \
-            device_id = {device_id} \
+            dateini_local > timestamp '{self.date_start}' \
+            and dateini_local < timestamp '{self.date_finish}' \
+            and device_id = {device_id} \
+            and status = 0 \
         ORDER BY dateini_local;")
         await conn.close()
 
         suitcases_list = list()
         for row in rows:
-            if row['status'] == 0:
-                suitcases_list.append(Suitcase(suitcase_id=row['id'],
-                                           suitcase_start=row['dateini_local'],
-                                           suitcase_finish=row['local_date'],
-                                           package_type=row['package_type'],
-                                           polycom_id=row['polycom_id'],
-                                           totalid=row['totalid'],
-                                           status=row['status'],
-                                           duration=row['duration'],
-                                           device_id=device_id)
-                                  )
+            suitcases_list.append(Suitcase(suitcase_id=row['id'],
+                                        suitcase_start=row['dateini_local'],
+                                        suitcase_finish=row['local_date'],
+                                        package_type=row['package_type'],
+                                        polycom_id=row['polycom_id'],
+                                        totalid=row['totalid'],
+                                        status=row['status'],
+                                        duration=row['duration'],
+                                        device_id=device_id)
+                                )
         return suitcases_list.copy()
     
     
@@ -391,3 +391,70 @@ class Request():
         await conn.close()
         return parent_id
         
+    async def update_status(self, event=None, task_id=None):
+        '''
+        Обновляем исходные записи в своих таблицах.
+        
+        :param event: - словарь события.
+        '''
+        # conn = await self._connect_database() #control_db
+        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        
+        if task_id == None and event['type'] == 'suitcase_start':
+            conn = await self._connect_database()
+            await conn.execute("\
+            UPDATE polycomm_suitcase \
+            SET status = $1, csp = $2, unpaid = $3, in_task = True, \
+                to_account = $4 \
+            WHERE polycom_id = $5;",
+            event['object'].status, 
+            event['object'].csp, 
+            event['object'].unpaid, 
+            event['object'].to_account,
+            event['object'].polycom_id
+            )
+            print('suitcase')
+        
+        elif task_id == None and event['type'] == 'alarm':
+            conn = await self._connect_database()
+            await conn.execute("\
+            UPDATE polycommalarm \
+            SET status = $1 \
+            WHERE polycommalarm_id = $2;",
+            event['object'].status, 
+            event['object'].polycommalarm_id
+            )
+            print('alarm')
+            
+        elif task_id == None and event['type'] == 'issue':
+            conn = await self._connect_database()
+            await conn.execute("\
+            UPDATE polycommissue \
+            SET status = $1 \
+            WHERE polycommissue_id = $2;",
+            event['object'].status, 
+            event['object'].polycommissue_id
+            )
+            print('issue')
+            
+        elif task_id == None and event['type'] == 'receipt':
+            conn = await self._connect_database()
+            await conn.execute("\
+            UPDATE receipts \
+            SET status = $1 \
+            WHERE receipt_id = $2;",
+            event['object'].status, 
+            event['object'].receipt_id
+            )
+            print('receipt')
+            
+        elif task_id != None:
+            await conn.execute("\
+            UPDATE task \
+            SET status = 1 \
+            WHERE id = $1;", task_id
+            )
+            print('task_id')
+
+
+        await conn.close()
