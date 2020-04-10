@@ -2,10 +2,8 @@ import os
 import logging
 import logging.handlers as handlers
 
-DIR_NAME_LOG = 'logs'
-FILE_NAME_LOG = 'analytic.log'
-FILESIZE_LOG = 5 # in Mb
-COUNT_BACKUP_LOG = 5  
+from config import DIR_NAME_LOG, FILE_NAME_LOG, FILESIZE_LOG, COUNT_BACKUP_LOG
+
 
 if not os.path.exists(DIR_NAME_LOG):
     try:
