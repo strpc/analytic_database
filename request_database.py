@@ -126,12 +126,12 @@ class Suitcase():
 class Request():
     '''Класс с запросами к базе.'''
     def __init__(self, pg_user, pg_password, pg_host, pg_db, 
-                 date_start, date_finish):
+                 date_start, date_finish): #FIXME: убрать время
         self.pg_user = pg_user
         self.pg_password = pg_password
         self.pg_host = pg_host
         self.pg_db = pg_db
-        self.date_start = date_start
+        self.date_start = date_start #FIXME: убрать время
         self.date_finish = date_finish
     
     async def _connect_database(self):
@@ -180,7 +180,7 @@ class Request():
                 and device = {device_id} \
                 and status = 0 \
             ORDER BY localdate \
-            ")
+            ") #FIXME: убрать время
         await conn.close()
 
         for row in rows:
@@ -213,7 +213,7 @@ class Request():
                 and device = {device_id} \
                 and status = 0 \
             ORDER BY localdate \
-            ")
+            ") #FIXME: убрать время
         await conn.close()
 
         issue_list = list()
@@ -257,7 +257,7 @@ class Request():
             and dateclose < timestamp '{self.date_finish}' \
             and polycomm_device.id = {device_id} \
             and status = 0 \
-        ORDER BY dateclose")
+        ORDER BY dateclose") #FIXME: убрать время
         await conn.close()
 
         receipts_list = list()
@@ -290,7 +290,7 @@ class Request():
             and dateini_local < timestamp '{self.date_finish}' \
             and device_id = {device_id} \
             and status = 0 \
-        ORDER BY dateini_local;")
+        ORDER BY dateini_local;") #FIXME: убрать время
         await conn.close()
 
         suitcases_list = list()
@@ -396,6 +396,7 @@ class Request():
         Обновляем исходные записи в своих таблицах.
         
         :param event: - словарь события.
+        :param task_id: - id события в сущности task.
         '''
         # conn = await self._connect_database() #control_db
         conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
@@ -413,7 +414,7 @@ class Request():
             event['object'].to_account,
             event['object'].polycom_id
             )
-            print('suitcase')
+            print('suitcase') #FIXME:
         
         elif task_id == None and event['type'] == 'alarm':
             conn = await self._connect_database()
@@ -424,7 +425,7 @@ class Request():
             event['object'].status, 
             event['object'].polycommalarm_id
             )
-            print('alarm')
+            print('alarm') #FIXME:
             
         elif task_id == None and event['type'] == 'issue':
             conn = await self._connect_database()
@@ -435,7 +436,7 @@ class Request():
             event['object'].status, 
             event['object'].polycommissue_id
             )
-            print('issue')
+            print('issue') #FIXME:
             
         elif task_id == None and event['type'] == 'receipt':
             conn = await self._connect_database()
@@ -446,7 +447,7 @@ class Request():
             event['object'].status, 
             event['object'].receipt_id
             )
-            print('receipt')
+            print('receipt') #FIXME:
             
         elif task_id != None:
             await conn.execute("\
@@ -454,7 +455,23 @@ class Request():
             SET status = 1 \
             WHERE id = $1;", task_id
             )
-            print('task_id')
-
-
+            print('task_id') #FIXME:
         await conn.close()
+        
+        
+    async def update_status_and_resolved(self, task_id):
+        '''
+        Обновление status и параметра resolved в сущности task для событий, из
+        списка 'line_event'(к которым нет претензий).
+        
+        :param task_id: - id события в сущности task.
+        '''
+        # conn = await self._connect_database() #control_db
+        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        await conn.execute("\
+        UPDATE task \
+        SET status = 1, resolved = True \
+        WHERE id = $1;", task_id
+        )
+        await conn.close()
+        print('task_id') #FIXME:
