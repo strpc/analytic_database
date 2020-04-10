@@ -13,11 +13,12 @@ from config import (PG_USER,
                     PG_PASSWORD,
                     PG_HOST,
                     PG_DB,
-                    DATE_FORMAT,
-                    DATE_START,
-                    DATE_FINISH,
                     TIMEDELTA_CHECK,
                     LAST_EVENT_TIME)
+
+# dev settings:
+DATE_START = '2020-01-02' #FIXME: убрать время
+DATE_FINISH = '2020-01-03'
 
 
 async def run_app(request:Request):
