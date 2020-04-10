@@ -5,7 +5,11 @@ PG_HOST = ''
 PG_DB = ''
 
 # Timesettings:
-DATE_START = ''
-DATE_FINISH = ''
-DATE_FORMAT = ''
-TIMEDELTA_CHECK = 0
+LAST_EVENT_TIME = 900
+TIMEDELTA_CHECK = 420
+
+# Logging:
+DIR_NAME_LOG = 'logs'
+FILE_NAME_LOG = 'analytic.log'
+FILESIZE_LOG = 5 # in Mb
+COUNT_BACKUP_LOG = 5  
