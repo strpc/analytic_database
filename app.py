@@ -159,18 +159,22 @@ def check_broked_events(device:Device):
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     for block in device.line_event:
-        packages = quantitypackage = 0
+        packages_one = packages_double = 0
+        quantitypackageone = quantitypackagedouble = 0
         for event in block:
-            if event['type'] == 'suitcase_start' and event['object'].package_type == 1:
-                packages += 1
-            elif event['type'] == 'suitcase_start' and event['object'].package_type == 2:
-                packages += 1
+            if event['type'] == 'suitcase_start' and \
+            event['object'].package_type == 1:
+                packages_one += 1
+            if event['type'] == 'suitcase_start' and \
+            event['object'].package_type == 2:
+                packages_double += 1
 
-            if event['type'] == 'receipt' and (event['object'].quantitypackageone > 0 or event['object'].quantitypackagedouble > 0):
-                quantitypackage += event['object'].quantitypackageone
-                quantitypackage += event['object'].quantitypackagedouble
+            if event['type'] == 'receipt':
+                quantitypackageone += event['object'].quantitypackageone
+                quantitypackagedouble += event['object'].quantitypackagedouble
                 
-        if packages != quantitypackage:
+        if packages_one != quantitypackageone or \
+        packages_double != quantitypackagedouble:
             device.broken_line_event.append(block)
             device.line_event.remove(block)
     add_task(device)
@@ -607,7 +611,7 @@ if __name__ == '__main__':
                       pg_password=PG_PASSWORD,
                       pg_host=PG_HOST,
                       pg_db=PG_DB,
-                      date_start=DATE_START,
+                      date_start=DATE_START, #FIXME: убрать время
                       date_finish=DATE_FINISH
                       )
 
