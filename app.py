@@ -69,6 +69,7 @@ async def run_app(request:Request):
                  'type': 'suitcase_finish'
                 }
             )
+        del device.alarm_list, device.issue_list, device.receipts_list, device.suitcases_list #NOTE: optimization memory
         device.line_event.sort(key=lambda d: d['time'])
         sort_receipts(device)
 
@@ -236,8 +237,8 @@ def add_task(device:Device):
                 if event['object'].package_type == 2:
                     package_type_two += 1
         
-        if count_issue != 0 and count_receipt == count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
+        if count_alarm != 0 and count_receipt == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'уведомление', 'type': 'service'})
         
         elif count_receipt != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
@@ -245,7 +246,7 @@ def add_task(device:Device):
         elif count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone >= package_type_one and quantitypackageone != 0 and quantitypackagedouble >= package_type_two and quantitypackagedouble != 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
 
-        elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
+        elif count_receipt != 0 and count_alarm != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
         
         elif count_suitcase_start != 0 and count_receipt == 0 or count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone <= package_type_one and quantitypackagedouble <= package_type_two:
@@ -278,8 +279,8 @@ def add_task(device:Device):
                 if event['object'].package_type == 2:
                     package_type_two += 1
         
-        if count_issue != 0 and count_receipt == count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'оповещение', 'type': 'service'})
+        if count_alarm != 0 and count_receipt == count_suitcase_start == 0:
+            block.insert(0, {'task_type': 'уведоление', 'type': 'service'})
         
         elif count_receipt != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
@@ -287,7 +288,7 @@ def add_task(device:Device):
         elif count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone >= package_type_one and quantitypackageone != 0 and quantitypackagedouble >= package_type_two and quantitypackagedouble != 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
 
-        elif count_receipt != 0 and count_issue != 0 and count_suitcase_start == 0:
+        elif count_receipt != 0 and count_alarm != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
         
         elif count_suitcase_start != 0 and count_receipt == 0 or count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone <= package_type_one and quantitypackagedouble <= package_type_two:
@@ -612,6 +613,7 @@ async def update_database(device:Device):
                 to_task_event['event_id'] = event['object'].receipt_id
                 to_task_event['table_name'] = 'receipts'
                 to_task_event['ord'] += 1
+                to_task_event['parent_id'] = None
                 
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
