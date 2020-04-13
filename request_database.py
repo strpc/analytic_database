@@ -50,14 +50,13 @@ class Device():
 
 class Issue():
     '''Класс, содержащий информацию о оповещениях.'''
-    def __init__(self, suitcase_id, issue_time, device_id, issue_type, status,
-                 polycommissue_id):
+    def __init__(self, suitcase_id, issue_time, device_id, issue_type, status):
         self.suitcase_id = suitcase_id
         self.issue_time = issue_time
         self.device_id = device_id
         self.issue_type = issue_type
         self.status = status
-        self.polycommissue_id = polycommissue_id
+        self.polycommissue_id = ''
 
     def __str__(self):
         return f'{self.issue_type}'
@@ -204,7 +203,7 @@ class Request():
         conn = await self._connect_database()
         rows = await conn.fetch(f"\
             SELECT suitcase, localdate, device, polycomm_issue_type.title, \
-                status, polycommissue_id \
+                status \
             FROM polycommissue \
             INNER JOIN polycomm_issue_type ON \
                 polycommissue.type = polycomm_issue_type.id \
@@ -222,8 +221,8 @@ class Request():
                                 issue_time=row['localdate'],
                                 device_id=row['device'],
                                 issue_type=row['title'],
-                                status=row['status'],
-                                polycommissue_id=row['polycommissue_id']))
+                                status=row['status']
+                                ))
         return issue_list.copy()
 
     # async def get_task_type(self):
@@ -282,7 +281,7 @@ class Request():
         '''
         conn = await self._connect_database()
         rows = await conn.fetch(f"\
-        SELECT id, dateini_local, local_date, package_type, receipt_id, \
+        SELECT id, dateini_local, local_date, package_type, \
             polycom_id, totalid, status, duration \
         FROM polycomm_suitcase \
         WHERE \
@@ -315,8 +314,8 @@ class Request():
         
         :param event: - упаковка, с искусственным оповещением. 
         '''
-        # conn = await self._connect_database() #control_db
-        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database() #control_db
+        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         await conn.execute("\
         INSERT INTO polycommissue(id, \
                                   localdate, \
@@ -346,8 +345,8 @@ class Request():
         
         :param to_task: - словарь с нужными для записи в таблицу данными.
         '''
-        # conn = await self._connect_database() #control_db
-        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database() #control_db
+        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         task_id = await conn.fetchval("\
         INSERT INTO task(date, \
                         local_date, \
@@ -370,8 +369,8 @@ class Request():
         
         :param to_task_event: - словарь с нужными для записи в таблицу данными.
         '''
-        # conn = await self._connect_database() #control_db
-        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database() #control_db
+        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         parent_id = await conn.fetchval("\
         INSERT INTO task_to_event(event_id, \
                                   table_name, \
@@ -395,14 +394,14 @@ class Request():
         '''
         Обновляем исходные записи в своих таблицах.
         
-        :param event: - словарь события.
+        :param event: - эклемпряр класса события.
         :param task_id: - id события в сущности task.
         '''
-        # conn = await self._connect_database() #control_db
-        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database() #control_db
+        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         
         if task_id == None and event['type'] == 'suitcase_start':
-            conn = await self._connect_database()
+            # conn = await self._connect_database()
             await conn.execute("\
             UPDATE polycomm_suitcase \
             SET status = $1, csp = $2, unpaid = $3, in_task = True, \
@@ -417,7 +416,7 @@ class Request():
             print('suitcase') #FIXME:
         
         elif task_id == None and event['type'] == 'alarm':
-            conn = await self._connect_database()
+            # conn = await self._connect_database()
             await conn.execute("\
             UPDATE polycommalarm \
             SET status = $1 \
@@ -428,7 +427,7 @@ class Request():
             print('alarm') #FIXME:
             
         elif task_id == None and event['type'] == 'issue':
-            conn = await self._connect_database()
+            # conn = await self._connect_database()
             await conn.execute("\
             UPDATE polycommissue \
             SET status = $1 \
@@ -439,7 +438,7 @@ class Request():
             print('issue') #FIXME:
             
         elif task_id == None and event['type'] == 'receipt':
-            conn = await self._connect_database()
+            # conn = await self._connect_database()
             await conn.execute("\
             UPDATE receipts \
             SET status = $1 \
@@ -466,8 +465,8 @@ class Request():
         
         :param task_id: - id события в сущности task.
         '''
-        # conn = await self._connect_database() #control_db
-        conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database() #control_db
+        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         await conn.execute("\
         UPDATE task \
         SET status = 1, resolved = True \
