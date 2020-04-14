@@ -8,13 +8,16 @@ from datetime import timedelta, datetime
 import csv
 
 import logger
+import dwr_service
 from request_database import Request, Device
 from config import (PG_USER,
                     PG_PASSWORD,
                     PG_HOST,
                     PG_DB,
                     TIMEDELTA_CHECK,
-                    LAST_EVENT_TIME)
+                    LAST_EVENT_TIME,
+                    DEVICE_WITHOUT_RECEIPTS
+                    )
 
 # dev settings:
 DATE_START = '2020-01-02' #FIXME: убрать время
@@ -34,7 +37,6 @@ async def run_app(request:Request):
         device.issue_list = await request.get_issue(device.device_id)
         device.receipts_list = await request.get_receipts(device.device_id)
         device.suitcases_list = await request.get_suitcases(device.device_id)
-
         for alarm in device.alarm_list:
             device.line_event.append(
                 {'time': alarm.alarm_time,
@@ -687,11 +689,6 @@ async def update_database(device:Device):
             await request.update_status(event=event)
         await request.update_status_and_resolved(task_id=to_task_event['task_id'])
             
-            
-            
-
-
-        
 
 def create_csv(device:Device):
     '''
@@ -754,5 +751,8 @@ if __name__ == '__main__':
 
     from time import time
     t1 = time()
-    asyncio.run(run_app(request))
+    # asyncio.run(run_app(request))
+    if DEVICE_WITHOUT_RECEIPTS:
+        asyncio.run(dwr_service.run_app(request))
+        
     print(f"Passed: {round(time() - t1, 2)}")
