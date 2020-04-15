@@ -409,6 +409,7 @@ class Request():
                     to_task['type']
                     )
                 await conn.close()
+                print('task\'s created')
                 return task_id
             except Exception as e:
                 logger.create('Произошла ошибка при создании записи '
@@ -427,7 +428,6 @@ class Request():
         # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
         if conn:
             try:
-                # print(to_task_event['event_id'])
                 parent_id = await conn.fetchval("\
                 INSERT INTO task_to_event(event_id, \
                                         table_name, \
@@ -484,6 +484,8 @@ class Request():
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycomm_suitcase. Метод update_status', 
                                                                             e)
+            finally:
+                await conn.close()
                 
         
         elif task_id == None and event['type'] == 'alarm' and conn:
@@ -502,6 +504,8 @@ class Request():
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycommalarm. Метод update_status', 
                                                                             e)
+            finally:
+                await conn.close()
             
         elif task_id == None and event['type'] == 'issue' and conn:
             # conn = await self._connect_database()
@@ -519,6 +523,8 @@ class Request():
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycommissue. Метод update_status', 
                                                                             e)
+            finally:
+                await conn.close()
             
         elif task_id == None and event['type'] == 'receipt' and conn:
             # conn = await self._connect_database()
@@ -535,6 +541,8 @@ class Request():
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности receipts. Метод update_status', e)
+            finally:
+                await conn.close()
             
         elif task_id != None and conn:
             try:
@@ -547,7 +555,8 @@ class Request():
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности task. Метод update_status', e)
-        await conn.close()
+            finally:
+                await conn.close()
         
         
     async def update_status_and_resolved(self, task_id):
