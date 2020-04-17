@@ -28,7 +28,7 @@ async def run_app(request:Request):
     '''
     Получение списка устройств для упаковок, типов оповещений, событий к ним,
     добавление всех событий в список словарей. Сортировка словаря.
-    
+
     :param request: экземпляр класса Get_request().
     '''
     devices = await request.get_devices()
@@ -79,7 +79,7 @@ async def run_app(request:Request):
 def sort_receipts(device:Device):
     '''
     Правка событий по признаку "чек после упаковки".
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     last = None
@@ -87,7 +87,7 @@ def sort_receipts(device:Device):
         if device.line_event[i]['type'] in {'suitcase_start', 'suitcase_finish'}:
             last = device.line_event[i]['type']
         if device.line_event[i]['type'] == 'receipt':
-            
+
             if last == None:
                 j = i
                 while j < len(device.line_event) and device.line_event[j]['type'] not in {'suitcase_start', 'suitcase_finish'}:
@@ -109,8 +109,8 @@ def grouping_events(device:Device):
     '''
     Группировка событий по признаку "полный цикл". Добавление события "none"
     после каждого полного цикла упаковки. Проверка на время между упаковками
-    (не более TIMEDELTA_CHECK). 
-    
+    (не более TIMEDELTA_CHECK).
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     i = 0
@@ -130,12 +130,12 @@ def listing_events(device:Device):
     Создание списка списков словарей. Каждый элемент главного списка - это
     список, который содержит в себе n-элементов словарей событий полного
     цикла упаковки.
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     new_list = [[]]
     j = 0
-    while len(device.line_event) > 0:        
+    while len(device.line_event) > 0:
         if device.line_event[0]['type'] != 'none':
             new_list[j].append(device.line_event.pop(0))
         else:
@@ -154,18 +154,18 @@ def check_last_event_time(device:Device):
     '''
     Проверка последнего события на предмет того, что оно произошло раньше, чем
     LAST_EVENT_TIME(900 сек или 15 минут).
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     line_event = []
     for block in device.line_event:
         if len(block) != 0:
-            if block[-1]['type'] in {'suitcase_start', 'suitcase_finish', 
+            if block[-1]['type'] in {'suitcase_start', 'suitcase_finish',
                                      'issue', 'alarm', 'receipt'}:
                 if datetime.now() - block[-1]['time'] > timedelta(
                                                         seconds=LAST_EVENT_TIME):
                     line_event.append(block)
-                    
+
     device.line_event = line_event
     check_broked_events(device)
 
@@ -175,7 +175,7 @@ def check_broked_events(device:Device):
     Проверка упаковок на наличие чеков к ним
     device.broken_line_event - список бракованных упаковок.
     device.line_event - список успешных упаковок.
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     broken_line_event = []
@@ -194,7 +194,7 @@ def check_broked_events(device:Device):
             if event['type'] == 'receipt':
                 quantitypackageone += event['object'].quantitypackageone
                 quantitypackagedouble += event['object'].quantitypackagedouble
-                
+
         if packages_one != quantitypackageone or \
         packages_double != quantitypackagedouble:
             broken_line_event.append(block)
@@ -208,12 +208,12 @@ def check_broked_events(device:Device):
 def add_task(device:Device):
     '''
     Добавления типа задачи:
-    оповещение, чек без упаковок, чеки без упаковок и уведомление, 
+    оповещение, чек без упаковок, чеки без упаковок и уведомление,
     КПУ/КнПУ, смешанные
     в ключ словаря task_type
     {'task_type': '% %', 'type': 'service'}
     для каждого блока с событиями
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     #broken_line_event
@@ -225,7 +225,7 @@ def add_task(device:Device):
                 count_alarm += 1
             elif event['type'] == 'issue':
                 count_issue += 1
-            
+
             elif event['type'] == 'receipt':
                 count_receipt += 1
                 if event['object'].quantitypackageone > 0:
@@ -238,26 +238,26 @@ def add_task(device:Device):
                     package_type_one += 1
                 if event['object'].package_type == 2:
                     package_type_two += 1
-        
+
         if count_alarm != 0 and count_receipt == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'уведомление', 'type': 'service'})
-        
+
         elif count_receipt != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
-        
+
         elif count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone >= package_type_one and quantitypackageone != 0 and quantitypackagedouble >= package_type_two and quantitypackagedouble != 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
 
         elif count_receipt != 0 and count_alarm != 0 and count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
-        
+            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'})
+
         elif count_suitcase_start != 0 and count_receipt == 0 or count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone <= package_type_one and quantitypackagedouble <= package_type_two:
             block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'})
-        
-        else:
-            block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
 
-        
+        else:
+            block.insert(0, {'task_type': 'смешанные', 'type': 'service'})
+
+
     # line_event
     for block in device.line_event:
         count_alarm = count_issue = count_receipt = count_suitcase_start = 0
@@ -267,7 +267,7 @@ def add_task(device:Device):
                 count_alarm += 1
             elif event['type'] == 'issue':
                 count_issue += 1
-            
+
             elif event['type'] == 'receipt':
                 count_receipt += 1
                 if event['object'].quantitypackageone > 0:
@@ -280,41 +280,41 @@ def add_task(device:Device):
                     package_type_one += 1
                 if event['object'].package_type == 2:
                     package_type_two += 1
-        
+
         if count_alarm != 0 and count_receipt == count_suitcase_start == 0:
             block.insert(0, {'task_type': 'уведоление', 'type': 'service'})
-        
+
         elif count_receipt != 0 and count_suitcase_start == 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
-        
+
         elif count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone >= package_type_one and quantitypackageone != 0 and quantitypackagedouble >= package_type_two and quantitypackagedouble != 0:
             block.insert(0, {'task_type': 'чек без упаковки', 'type': 'service'})
 
         elif count_receipt != 0 and count_alarm != 0 and count_suitcase_start == 0:
-            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'}) 
-        
+            block.insert(0, {'task_type': 'чеки без упаковок и уведомления', 'type': 'service'})
+
         elif count_suitcase_start != 0 and count_receipt == 0 or count_suitcase_start != 0 and count_receipt != 0 and quantitypackageone <= package_type_one and quantitypackagedouble <= package_type_two:
             block.insert(0, {'task_type': 'КПУ/КнПУ', 'type': 'service'})
-        
-        else:
-            block.insert(0, {'task_type': 'смешанные', 'type': 'service'}) 
 
-    
-    
+        else:
+            block.insert(0, {'task_type': 'смешанные', 'type': 'service'})
+
+
+
     receipt_broken_line_event_sync(device)
-    
-    
+
+
 def receipt_broken_line_event_sync(device:Device):
     '''
     Присваивание чека каждой упаковке событий списка broken_line_event
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     for block in device.broken_line_event:
         count_packageone = count_packagedouble = 0
         if block[0]['task_type'] in {'КПУ/КнПУ', 'чек без упаковок', 'смешанные'}:
             for event in block[::-1]:
-                
+
                 if event['type'] == 'receipt':
                     count_packageone = event['object'].quantitypackageone
                     count_packagedouble = event['object'].quantitypackagedouble
@@ -328,7 +328,7 @@ def receipt_broken_line_event_sync(device:Device):
                             event['object'].count_packageone -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
-                            
+
                         elif block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i-1]['type']  == 'suitcase_start':
                             block[i]['object'].receipt_id = event['object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 2
@@ -336,7 +336,7 @@ def receipt_broken_line_event_sync(device:Device):
                             event['object'].count_packagedouble -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
-                    
+
                         elif block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i-1]['type'] == 'suitcase_start' and count_packagedouble == 0 and count_packageone == 0:
                             block[i]['object'].receipt_id = -1
                             if count_packageone == count_packagedouble == 0:
@@ -352,7 +352,7 @@ def receipt_broken_line_event_sync(device:Device):
                             event['object'].count_packageone -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
-                        
+
                         elif block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i-1]['type']  != 'suitcase_start':
                             block[i]['object'].receipt_id = event['object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 2
@@ -360,7 +360,7 @@ def receipt_broken_line_event_sync(device:Device):
                             event['object'].count_packagedouble -= 1
                             if count_packageone == count_packagedouble == 0:
                                 break
-                        
+
                         elif block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i-1]['type']  != 'suitcase_start' and (count_packagedouble == 0 and count_packageone == 0):
                             block[i]['object'].receipt_id = -1
                             if count_packageone == count_packagedouble == 0:
@@ -375,7 +375,7 @@ def receipt_broken_line_event_sync(device:Device):
                                 block[i]['object'].package_type_by_receipt = 1
                                 count_packageone -= 1
                                 event['object'].count_packageone -= 1
-                                
+
                             elif count_packagedouble != 0 and block[i]['type'] == 'suitcase_finish' and block[i]['object'].receipt_id == '':
                                 block[i]['object'].receipt_id = event['object'].receipt_id
                                 block[i]['object'].package_type_by_receipt = 2
@@ -383,7 +383,7 @@ def receipt_broken_line_event_sync(device:Device):
                                 event['object'].count_packagedouble -= 1
                             i -= 1
 
-        for event in block:                
+        for event in block:
             if event['type'] == 'suitcase_finish' and event['object'].receipt_id == '':
                 event['object'].receipt_id = -1
     receipt_line_event_sync(device)
@@ -392,13 +392,13 @@ def receipt_broken_line_event_sync(device:Device):
 def receipt_line_event_sync(device:Device):
     '''
     Присваивание чека каждой упаковке событий списка line_event(события без "претензий").
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     for block in device.line_event:
         count_packageone = count_packagedouble = 0
         for event in block:
-            
+
             if event['type'] == 'receipt':
                 count_packageone = event['object'].quantitypackageone
                 count_packagedouble = event['object'].quantitypackagedouble
@@ -411,14 +411,14 @@ def receipt_line_event_sync(device:Device):
                         count_packageone -= 1
                         if count_packageone == count_packagedouble == 0:
                             break
-                        
+
                     elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  == 'suitcase_finish':
                         block[i]['object'].receipt_id = event['object'].receipt_id
                         block[i]['object'].package_type_by_receipt = 2
                         count_packagedouble -= 1
                         if count_packageone == count_packagedouble == 0:
                             break
-                
+
                     elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i+1]['type'] == 'suitcase_finish' and count_packagedouble == 0 and count_packageone == 0:
                         block[i]['object'].receipt_id = -1
                         if count_packageone == count_packagedouble == 0:
@@ -433,14 +433,14 @@ def receipt_line_event_sync(device:Device):
                         count_packageone -= 1
                         if count_packageone == count_packagedouble == 0:
                             break
-                    
+
                     elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type == 2 and count_packagedouble != 0 and block[i+1]['type']  != 'suitcase_finish':
                         block[i]['object'].receipt_id = event['object'].receipt_id
                         block[i]['object'].package_type_by_receipt = 2
                         count_packagedouble -= 1
                         if count_packageone == count_packagedouble == 0:
                             break
-                    
+
                     elif block[i]['type'] == 'suitcase_start' and block[i]['object'].receipt_id == '' and block[i]['object'].package_type in {1, 2, None, 'None'} and block[i+1]['type']  != 'suitcase_finish' and (count_packagedouble == 0 and count_packageone == 0):
                         block[i]['object'].receipt_id = -1
                         if count_packageone == count_packagedouble == 0:
@@ -460,7 +460,7 @@ def receipt_line_event_sync(device:Device):
                             count_packagedouble -= 1
                         i += 1
 
-        for event in block:                
+        for event in block:
             if event['type'] == 'suitcase_start' and event['object'].receipt_id == '':
                 event['object'].receipt_id = -1
     adding_attributes(device)
@@ -469,7 +469,7 @@ def receipt_line_event_sync(device:Device):
 def adding_attributes(device:Device):
     '''
     Добавление аттрибутов для будущих уведомлений
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     def add_template(event):
@@ -478,9 +478,9 @@ def adding_attributes(device:Device):
         event['object'].issue_list['suitcase'] = event['object'].polycom_id
         event['object'].issue_list['date'] = event['object'].suitcase_finish
         event['object'].issue_list['localdate'] = event['object'].suitcase_finish
-    
-    
-    
+
+
+
     for block in device.broken_line_event:
 
         i = 0
@@ -494,36 +494,36 @@ def adding_attributes(device:Device):
                     block[i]['object'].to_account = True
                     block[i]['object'].issue_list['type'] = 7
                     add_template(block[i])
-                    
+
                 #КПУ оплаченная
                 elif block[i]['object'].receipt_id not in {-1, None} and block[i+1]['type'] not in {'alarm', 'issue'}:
                     block[i]['object'].csp = True
                     block[i]['object'].unpaid = False
                     block[i]['object'].to_account = True
-                    
+
                     if block[i]['object'].package_type_by_receipt == 1 and block[i]['object'].package_type == 2:
                         block[i]['object'].issue_list['type'] = 8
                         add_template(block[i])
-                        
+
                     elif block[i]['object'].package_type_by_receipt == 2 and block[i]['object'].package_type == 1:
                         block[i]['object'].issue_list['type'] = 9
                         add_template(block[i])
 
-                
+
                 elif block[i+1]['type'] in {'alarm', 'issue'}:
                     if block[i]['object'].receipt_id == -1:  #КнПУ и неоплаченная
                         block[i]['object'].csp = False
                         block[i]['object'].unpaid = True
                         block[i]['object'].to_account = False
-                        
-                    
+
+
                     elif block[i]['object'].receipt_id != -1:  #КПУ оплаченная
-                        
+
                         block[i]['object'].csp = True
                         block[i]['object'].unpaid = False
                         block[i]['object'].to_account = True
 
-                        
+
                         if block[i]['object'].package_type == 2 and block[i]['object'].package_type_by_receipt == 1:
                             block[i]['object'].issue_list['type'] = 8
                             add_template(block[i])
@@ -539,7 +539,7 @@ def adding_attributes(device:Device):
 async def update_database(device:Device):
     '''
     Генерирование информации для будущих записей в бд, создание записей в бд.
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     # broken_line_event
@@ -567,7 +567,7 @@ async def update_database(device:Device):
                 await request.create_polycommissue_event(block[i]['object'])
             if block[i]['type'] == 'suitcase_start':
                 block[i]['object'].status = 1
-            
+
             elif block[i]['type'] in {'alarm', 'issue'}:
                 block[i]['object'].status = 1
             elif block[i]['type'] == 'receipt':
@@ -577,8 +577,8 @@ async def update_database(device:Device):
                 else:
                     block[i]['object'].status = 1
             i += 1
-        
-        
+
+
         # task data:
         if block[-1]['type'] == 'receipt':
             to_task['date'] = block[-1]['object'].dateclosemoscow
@@ -590,8 +590,8 @@ async def update_database(device:Device):
         to_task['type'] = device.task_type.get(block[0]['task_type'])
         to_task_event['task_id'] = await request.create_task(to_task)
          #FIXME:
-        
-        
+
+
         #task_to_event_data:
         for event in block:
             if event['type'] == 'suitcase_start':
@@ -600,23 +600,23 @@ async def update_database(device:Device):
                 to_task_event['table_name'] = 'polycomm_suitcase'
                 to_task_event['ord'] += 1
                 to_task_event['parent_id'] = await request.create_task_to_event(to_task_event)
-                
+
             elif event['type'] == 'issue':
                 to_task_event['event_id'] = event['object'].polycommissue_id
                 to_task_event['table_name'] = 'polycommissue'
                 to_task_event['ord'] += 1
-                
+
             elif event['type'] == 'alarm':
                 to_task_event['event_id'] = event['object'].polycommalarm_id
                 to_task_event['table_name'] = 'polycommalarm'
                 to_task_event['ord'] += 1
-                
+
             elif event['type'] == 'receipt':
                 to_task_event['event_id'] = event['object'].receipt_id
                 to_task_event['table_name'] = 'receipts'
                 to_task_event['ord'] += 1
                 to_task_event['parent_id'] = None
-                
+
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
             await request.update_status(event=event)
@@ -625,7 +625,7 @@ async def update_database(device:Device):
 
     # line event:
     for block in device.line_event:
-        count = 1        
+        count = 1
         to_task = {
             'date': '',
             'local_date': '',
@@ -640,11 +640,11 @@ async def update_database(device:Device):
             'created_date': '',
             'task_id': None
         }
-        
+
         for event in block:
             if event['type'] in {'suitcase_start', 'issue', 'alarm', 'receipt'}:
                 event['object'].status = 1
-            
+
         # task data:
         if block[-1]['type'] == 'receipt':
             to_task['date'] = block[-1]['object'].dateclosemoscow
@@ -655,7 +655,7 @@ async def update_database(device:Device):
         to_task['device_id'] = device.device_id
         to_task['type'] = device.task_type.get(block[0]['task_type'])
         to_task_event['task_id'] = await request.create_task(to_task)
-        
+
         #task_to_event_data:
         for event in block:
             if event['type'] == 'suitcase_start':
@@ -668,43 +668,43 @@ async def update_database(device:Device):
                 event['object'].unpaid = False
                 event['object'].in_task = False
                 event['object'].to_account = True
-                
+
             elif event['type'] == 'issue':
                 to_task_event['event_id'] = event['object'].polycommissue_id
                 to_task_event['table_name'] = 'polycommissue'
                 to_task_event['ord'] += 1
-                
+
             elif event['type'] == 'alarm':
                 to_task_event['event_id'] = event['object'].polycommalarm_id
                 to_task_event['table_name'] = 'polycommalarm'
                 to_task_event['ord'] += 1
-                
+
             elif event['type'] == 'receipt':
                 to_task_event['event_id'] = event['object'].receipt_id
                 to_task_event['table_name'] = 'receipts'
                 to_task_event['ord'] += 1
-                
+
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
             await request.update_status(event=event)
         await request.update_status_and_resolved(task_id=to_task_event['task_id'])
-            
+
 
 def create_csv(device:Device):
     '''
     Cоздание CSV-файла с данными.
-    
+
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     with open('suitcases_broken.csv', 'a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file, delimiter=";")
         fieldnames = ['status', 'id', 'type', 'date', 'total', 'suitcase', 'localdate']
         # writer_dic = csv.DictWriter(file, fieldnames=fieldnames, delimiter=";")
-        
+
         for block in device.broken_line_event:
             writer.writerow((device.name, ''))
             for i in block:
-                
+
                 if i['type'] == 'service':
                     writer.writerow(('','task_type:', i['task_type']))
                 elif i['type'] == 'broken':
@@ -718,12 +718,12 @@ def create_csv(device:Device):
                                         f"suitcase: {i['object'].issue_list['suitcase']}",f"date: {i['object'].issue_list['date']}",
                                         f"localdate: {i['object'].issue_list['localdate']}"))
                         writer.writerow((f"type: {i['object'].issue_list['type']}",))
-                    
+
                     writer.writerow((f"csp: {i['object'].csp}",
                                     f"unpaid: {i['object'].unpaid}",
                                     f"to_account: {i['object'].to_account}"))
 
-                    
+
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
                     writer.writerow('')
@@ -734,7 +734,7 @@ def create_csv(device:Device):
                 # NOTE: уведомления/оповещения
                 elif i['type'] == 'issue':
                     writer.writerow(('', i['time'], i['type'], i['object'].issue_type))
-                    
+
                 elif i['type'] == 'alarm':
                     writer.writerow(('', i['time'], i['type'], i['object'].alarm_type))
             writer.writerow('')
@@ -754,5 +754,5 @@ if __name__ == '__main__':
     # asyncio.run(run_app(request))
     if DEVICE_WITHOUT_RECEIPTS:
         asyncio.run(dwr_service.run_app(request))
-        
+
     print(f"Passed: {round(time() - t1, 2)}")
