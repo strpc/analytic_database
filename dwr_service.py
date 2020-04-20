@@ -13,7 +13,7 @@ async def run_app(request:Request):
 
     :param request: экземпляр класса Get_request().
     '''
-    devices = await request.get_devices()
+    devices = await request.get_devices(status_type_device=2)
     for device in devices:
         device.request = request
         device.alarm_list = await request.get_alarm(device.device_id)
@@ -267,4 +267,5 @@ async def update_database(device:Device):
             if event['type'] in {'issue', 'alarm'}:
                 await device.request.create_task_to_event(to_task_event)
             await device.request.update_status(event=event)
-        await device.request.update_status(task_id=to_task_event['task_id'])
+        if to_task_event['task_id']:
+            await device.request.update_status(task_id=to_task_event['task_id'])
