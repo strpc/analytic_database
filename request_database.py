@@ -8,7 +8,7 @@ import logger
 
 class Alarm():
     '''Класс, содержащий информацию о уведомлениях'''
-    def __init__(self, polycommalarm_id, alarm_time, 
+    def __init__(self, polycommalarm_id, alarm_time,
                  alarm_device_id, alarm_type, status):
         self.polycommalarm_id = polycommalarm_id
         self.alarm_time = alarm_time
@@ -66,11 +66,11 @@ class Issue():
 
     def __repr__(self):
         return f'{self.issue_type}'
-    
+
 
 class Receipts():
     '''Класс, содержащий информацию о чеках.'''
-    def __init__(self, receipt_id, receipts_timestamp, device_id, 
+    def __init__(self, receipt_id, receipts_timestamp, device_id,
                  quantitypackageone, quantitypackagedouble, status,
                  dateclosemoscow):
         self.receipt_id = receipt_id
@@ -92,7 +92,7 @@ class Receipts():
 
 class Suitcase():
     '''Класс, содержащий информацию о упаковках'''
-    def __init__(self, suitcase_id, suitcase_start, suitcase_finish, 
+    def __init__(self, suitcase_id, suitcase_start, suitcase_finish,
                  package_type, polycom_id, totalid, status, duration, device_id):
         self.device_id = device_id
         self.suitcase_id = suitcase_id
@@ -127,16 +127,15 @@ class Suitcase():
 
 class Request():
     '''Класс с запросами к базе.'''
-    def __init__(self, pg_user, pg_password, pg_host, pg_db, 
-                 date_start, date_finish): #FIXME: убрать время
+    def __init__(self, pg_user, pg_password, pg_host, pg_db,
+                 date_start, date_finish): #dev
         self.pg_user = pg_user
         self.pg_password = pg_password
         self.pg_host = pg_host
         self.pg_db = pg_db
-        self.date_start = date_start #FIXME: убрать время
+        self.date_start = date_start #dev
         self.date_finish = date_finish
-    
-    
+
     async def _connect_database(self):
         '''Создание подключения к базе.'''
         try:
@@ -144,26 +143,31 @@ class Request():
                 f'postgresql://{self.pg_user}:{self.pg_password}'
                             f'@{self.pg_host}/{self.pg_db}')
             return conn
-        
+
         except Exception as e:
             logger.create('Произошла ошибка при попытке подключения к'
                           ' базе данных. Метод _connect_database', e)
             return False
 
 
-    async def get_devices(self):
-        '''Получение списка активных устройств упаковки из базы. 
-        Создание списка экземпляров классов Device'''
+    async def get_devices(self, status_type_device):
+        '''Получение списка активных устройств упаковки из базы.
+        Создание списка экземпляров классов Device
+
+        :param status_type_device: - статус устройства:
+                                                    1 - устройство без чеков
+                                                    2 - устройство с чеками
+        '''
         conn = await self._connect_database()
         if conn:
             try:
                 rows = await conn.fetch('\
                     SELECT id, title FROM polycomm_device \
-                    ORDER BY id; \
-                    ')
-                        #            dev: INNER JOIN timestamps \
-                        # on polycomm_device.code = CAST(timestamps.devicecode as int) \
-                        # and timestamps.ready=True and timestamps.status_type_device=1 \
+                    INNER JOIN timestamps ON \
+                    polycomm_device.code = CAST(timestamps.devicecode as int) \
+                    and timestamps.ready = True \
+                    and timestamps.status_type_device = $1 \
+                    ORDER BY id;', status_type_device)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка активных'
                               ' устройств из базы. Метод get_devices', e)
@@ -179,27 +183,25 @@ class Request():
 
     async def get_alarm(self, device_id):
         '''
-        Получение уведомлений из базы. 
+        Получение уведомлений из базы.
         Создание списка экземпляров классов Alarm
-        
+
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
         conn = await self._connect_database()
         if conn:
             try:
-                rows = await conn.fetch(f"\
+                rows = await conn.fetch("\
                     SELECT polycommalarm_id, localdate, device, \
                         polycomm_alarm_type.title, polycommalarm.status \
                     FROM polycommalarm \
                     INNER JOIN polycomm_alarm_type ON \
                         polycomm_alarm_type.id = polycommalarm.alarmtype \
-                    WHERE localdate > timestamp '{self.date_start}' \
-                        and localdate < timestamp '{self.date_finish}' \
-                        and device = {device_id} \
+                    WHERE device = $1 \
                         and status = 0 \
                     ORDER BY localdate \
-                    ") #FIXME: убрать время
+                    ", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'уведомлений из базы. Метод get_alarm', e)
@@ -221,27 +223,25 @@ class Request():
 
     async def get_issue(self, device_id):
         '''
-        Получение оповещений из базы. 
+        Получение оповещений из базы.
         Создание списка экземпляров классов Issue
-        
+
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
         conn = await self._connect_database()
         if conn:
             try:
-                rows = await conn.fetch(f"\
+                rows = await conn.fetch("\
                     SELECT suitcase, localdate, device, polycomm_issue_type.title, \
                         status, polycommissue_id \
                     FROM polycommissue \
                     INNER JOIN polycomm_issue_type ON \
                         polycommissue.type = polycomm_issue_type.id \
-                    WHERE localdate > timestamp '{self.date_start}' \
-                        and localdate < timestamp '{self.date_finish}' \
-                        and device = {device_id} \
+                    WHERE device = $1 \
                         and status = 0 \
                     ORDER BY localdate \
-                    ") #FIXME: убрать время
+                    ", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'оповещений из базы. Метод get_issue', e)
@@ -263,27 +263,25 @@ class Request():
 
     async def get_receipts(self, device_id):
         '''
-        Получение чеков из базы. 
+        Получение чеков из базы.
         Создание списка экземпляров классов Receipts
-        
+
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
         conn = await self._connect_database()
         if conn:
             try:
-                rows = await conn.fetch(f"\
+                rows = await conn.fetch("\
                 SELECT DISTINCT receipts.receipt_id, dateclose, polycomm_device.id, \
                     receipts.quantitypackageone, receipts.quantitypackagedouble, \
                     receipts.status, receipts.dateclosemoscow \
                 FROM receipts \
                 LEFT JOIN polycomm_device on \
                     CAST(receipts.devicecode as int) = polycomm_device.code \
-                WHERE dateclose > timestamp '{self.date_start}' \
-                    and dateclose < timestamp '{self.date_finish}' \
-                    and polycomm_device.id = {device_id} \
+                WHERE polycomm_device.id = $1 \
                     and status = 0 \
-                ORDER BY dateclose") #FIXME: убрать время
+                ORDER BY dateclose", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'чеков из базы. Метод get_receipts', e)
@@ -301,29 +299,24 @@ class Request():
                             status=row['status'],
                             dateclosemoscow=row['dateclosemoscow']))
         return receipts_list.copy()
-    
+
 
     async def get_suitcases(self, device_id):
         '''
-        Получение упаковок из базы. 
+        Получение упаковок из базы.
         Создание списка экземпляров классов Suitcase
-        
+
         :param device_id: - id активного устройства, полученный
         методом get_devices()
         '''
         conn = await self._connect_database()
         if conn:
             try:
-                rows = await conn.fetch(f"\
-                SELECT id, dateini_local, local_date, package_type, \
-                    polycom_id, totalid, status, duration \
-                FROM polycomm_suitcase \
-                WHERE \
-                    dateini_local > timestamp '{self.date_start}' \
-                    and dateini_local < timestamp '{self.date_finish}' \
-                    and device_id = {device_id} \
-                    and status = 0 \
-                ORDER BY dateini_local;") #FIXME: убрать время
+                rows = await conn.fetch("\
+                SELECT id, dateini_local, local_date, package_type,\
+                    polycom_id, totalid, status, duration\
+                FROM polycomm_suitcase\
+                WHERE status = 0 and device_id = $1;", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'упаковок из базы. Метод get_suitcases', e)
@@ -344,17 +337,16 @@ class Request():
                                         device_id=device_id)
                                 )
         return suitcases_list.copy()
-    
-    
+
+
     async def create_polycommissue_event(self, event):
         '''
         Создание записи в таблице polycommissue.
         Suitcase.issue_list['type'] in {7, 8, 9}
-        
-        :param event: - упаковка, с искусственным оповещением. 
+
+        :param event: - упаковка, с искусственным оповещением.
         '''
-        conn = await self._connect_database() #control_db
-        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database()
         if conn:
             try:
                 await conn.execute("\
@@ -384,16 +376,15 @@ class Request():
                               'Метод create_polycommissue_event', e)
                 await conn.close()
                 return False
-    
-    
+
+
     async def create_task(self, to_task):
         '''
         Создание записи в таблице task.
-        
+
         :param to_task: - словарь с нужными для записи в таблицу данными.
         '''
-        conn = await self._connect_database() #control_db
-        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database()
         if conn:
             try:
                 task_id = await conn.fetchval("\
@@ -409,23 +400,22 @@ class Request():
                     to_task['type']
                     )
                 await conn.close()
-                print('task\'s created')
+                # print('task\'s created')
                 return task_id
             except Exception as e:
                 logger.create('Произошла ошибка при создании записи '
                               'в сущности task. Метод create_task', e)
                 await conn.close()
                 return False
-        
-        
+
+
     async def create_task_to_event(self, to_task_event):
         '''
         Создание записи в таблице task_to_event.
-        
+
         :param to_task_event: - словарь с нужными для записи в таблицу данными.
         '''
-        conn = await self._connect_database() #control_db
-        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database()
         if conn:
             try:
                 parent_id = await conn.fetchval("\
@@ -448,102 +438,93 @@ class Request():
                 return parent_id
             except Exception as e:
                 logger.create('Произошла ошибка при создании записи '
-                              'в сущности task_to_event. Метод create_task_to_event', 
+                              'в сущности task_to_event. Метод create_task_to_event',
                                                                             e)
                 await conn.close()
                 return False
-    
-        
+
+
     async def update_status(self, event=None, task_id=None):
         '''
         Обновляем исходные записи в своих таблицах.
-        
+
         :param event: - эклемпряр класса события.
         :param task_id: - id события в сущности task.
         '''
-        conn = await self._connect_database() #control_db
-        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
-        
+        conn = await self._connect_database()
+
         if task_id == None and event['type'] == 'suitcase_start' and conn:
-            # conn = await self._connect_database()
             try:
-                print(event['object'].status)
                 await conn.execute("\
                 UPDATE polycomm_suitcase \
                 SET status = $1, csp = $2, unpaid = $3, in_task = True, \
                     to_account = $4 \
                 WHERE polycom_id = $5;",
-                event['object'].status, 
-                event['object'].csp, 
-                event['object'].unpaid, 
+                event['object'].status,
+                event['object'].csp,
+                event['object'].unpaid,
                 event['object'].to_account,
                 event['object'].polycom_id
                 )
-                print('suitcase') #FIXME:
+                # print('suitcase') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycomm_suitcase. Метод update_status', 
+                              'сущности polycomm_suitcase. Метод update_status',
                                                                             e)
             finally:
                 await conn.close()
-                
-        
+
+
         elif task_id == None and event['type'] == 'alarm' and conn:
-            # conn = await self._connect_database()
             try:
-                print(event['object'].status)
                 await conn.execute("\
                 UPDATE polycommalarm \
                 SET status = $1 \
                 WHERE polycommalarm_id = $2;",
-                event['object'].status, 
+                event['object'].status,
                 event['object'].polycommalarm_id
                 )
-                print('alarm') #FIXME:
+                # print('alarm') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycommalarm. Метод update_status', 
+                              'сущности polycommalarm. Метод update_status',
                                                                             e)
             finally:
                 await conn.close()
-            
+
         elif task_id == None and event['type'] == 'issue' and conn:
-            # conn = await self._connect_database()
             try:
-                print(event['object'].status)
                 await conn.execute("\
                 UPDATE polycommissue \
                 SET status = $1 \
                 WHERE polycommissue_id = $2;",
-                event['object'].status, 
+                event['object'].status,
                 event['object'].polycommissue_id
                 )
-                print('issue') #FIXME:
+                # print('issue') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycommissue. Метод update_status', 
+                              'сущности polycommissue. Метод update_status',
                                                                             e)
             finally:
                 await conn.close()
-            
+
         elif task_id == None and event['type'] == 'receipt' and conn:
-            # conn = await self._connect_database()
             try:
-                print(event['object'].status)
                 await conn.execute("\
                 UPDATE receipts \
                 SET status = $1 \
                 WHERE receipt_id = $2;",
-                event['object'].status, 
+                event['object'].status,
                 event['object'].receipt_id
                 )
-                print('receipt') #FIXME:
+                # print('receipt') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности receipts. Метод update_status', e)
             finally:
                 await conn.close()
-            
+
         elif task_id != None and conn:
             try:
                 await conn.execute("\
@@ -551,23 +532,22 @@ class Request():
                 SET status = 1 \
                 WHERE id = $1;", task_id
                 )
-                print('task_id') #FIXME:
+                # print('task_id') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности task. Метод update_status', e)
             finally:
                 await conn.close()
-        
-        
+
+
     async def update_status_and_resolved(self, task_id):
         '''
         Обновление status и параметра resolved в сущности task для событий, из
         списка 'line_event'(к которым нет претензий).
-        
+
         :param task_id: - id события в сущности task.
         '''
-        conn = await self._connect_database() #control_db
-        # conn = await asyncpg.connect('postgresql://postgres:1@localhost/test')
+        conn = await self._connect_database()
         if conn:
             try:
                 await conn.execute("\
@@ -575,10 +555,10 @@ class Request():
                 SET status = 1, resolved = True \
                 WHERE id = $1;", task_id
                 )
-                print('task_id') #FIXME:
+                # print('task_id') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности task. Метод update_status_and_resolved', 
+                              'сущности task. Метод update_status_and_resolved',
                                                                             e)
             finally:
                 await conn.close()
