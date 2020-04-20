@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-
+Запуск программы
 """
 
 import asyncio
 from datetime import timedelta, datetime
 import csv
+from time import sleep
 
 import logger
 import dwr_service
@@ -16,11 +17,12 @@ from config import (PG_USER,
                     PG_DB,
                     TIMEDELTA_CHECK,
                     LAST_EVENT_TIME,
-                    DEVICE_WITHOUT_RECEIPTS
+                    DEVICE_WITHOUT_RECEIPTS,
+                    TIME_SLEEP
                     )
 
 # dev settings:
-DATE_START = '2020-01-02' #FIXME: убрать время
+DATE_START = '2020-01-02'
 DATE_FINISH = '2020-01-03'
 
 
@@ -31,7 +33,7 @@ async def run_app(request:Request):
 
     :param request: экземпляр класса Get_request().
     '''
-    devices = await request.get_devices()
+    devices = await request.get_devices(status_type_device=1)
     for device in devices:
         device.alarm_list = await request.get_alarm(device.device_id)
         device.issue_list = await request.get_issue(device.device_id)
@@ -71,7 +73,8 @@ async def run_app(request:Request):
                  'type': 'suitcase_finish'
                 }
             )
-        del device.alarm_list, device.issue_list, device.receipts_list, device.suitcases_list #NOTE: optimization memory
+        del (device.alarm_list, device.issue_list,
+             device.receipts_list, device.suitcases_list)
         device.line_event.sort(key=lambda d: d['time'])
         sort_receipts(device)
 
@@ -563,7 +566,6 @@ async def update_database(device:Device):
         while len(block) > i:
             if block[i]['type'] == 'suitcase_start' and \
             block[i]['object'].issue_list.get('type') in {7, 8, 9}:
-                # pass #FIXME:
                 await request.create_polycommissue_event(block[i]['object'])
             if block[i]['type'] == 'suitcase_start':
                 block[i]['object'].status = 1
@@ -589,8 +591,6 @@ async def update_database(device:Device):
         to_task['device_id'] = device.device_id
         to_task['type'] = device.task_type.get(block[0]['task_type'])
         to_task_event['task_id'] = await request.create_task(to_task)
-         #FIXME:
-
 
         #task_to_event_data:
         for event in block:
@@ -620,7 +620,8 @@ async def update_database(device:Device):
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
             await request.update_status(event=event)
-        await request.update_status(task_id=to_task_event['task_id'])
+        if to_task_event['task_id']:
+            await request.update_status(task_id=to_task_event['task_id'])
 
 
     # line event:
@@ -687,7 +688,9 @@ async def update_database(device:Device):
             if event['type'] in {'issue', 'alarm', 'receipt'}:
                 await request.create_task_to_event(to_task_event)
             await request.update_status(event=event)
-        await request.update_status_and_resolved(task_id=to_task_event['task_id'])
+        if to_task_event['task_id']:
+            await request.update_status_and_resolved(
+                                            task_id=to_task_event['task_id'])
 
 
 def create_csv(device:Device):
@@ -699,7 +702,6 @@ def create_csv(device:Device):
     with open('suitcases_broken.csv', 'a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file, delimiter=";")
         fieldnames = ['status', 'id', 'type', 'date', 'total', 'suitcase', 'localdate']
-        # writer_dic = csv.DictWriter(file, fieldnames=fieldnames, delimiter=";")
 
         for block in device.broken_line_event:
             writer.writerow((device.name, ''))
@@ -745,14 +747,18 @@ if __name__ == '__main__':
                       pg_password=PG_PASSWORD,
                       pg_host=PG_HOST,
                       pg_db=PG_DB,
-                      date_start=DATE_START, #FIXME: убрать время
+                      date_start=DATE_START, #dev
                       date_finish=DATE_FINISH
                       )
 
-    from time import time
-    t1 = time()
-    # asyncio.run(run_app(request))
-    if DEVICE_WITHOUT_RECEIPTS:
-        asyncio.run(dwr_service.run_app(request))
 
-    print(f"Passed: {round(time() - t1, 2)}")
+    while True:
+        # from time import time #dev
+        # t1 = time()
+
+        asyncio.run(run_app(request))
+        if DEVICE_WITHOUT_RECEIPTS:
+            asyncio.run(dwr_service.run_app(request))
+        sleep(TIME_SLEEP)
+
+        # print(f"Passed: {round(time() - t1, 2)}")
