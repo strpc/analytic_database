@@ -79,11 +79,12 @@ async def run_app(request:Request):
             )
         del (device.alarm_list, device.issue_list,
              device.receipts_list, device.suitcases_list)
-        for i in device.line_event:
-            if i['time'] == None:
-                print(i)
-        # device.line_event.sort(key=lambda d: d['time'])
-        # sort_receipts(device)
+        device.line_event.sort(key=lambda d: d['time'])
+        if device.line_event:
+            sort_receipts(device)
+        else:
+            logger.create('Программа была прервана, так как данные для обработки'
+                          ' не были загружены. Метод run_app')
 
 
 def sort_receipts(device:Device):
@@ -541,6 +542,13 @@ def adding_attributes(device:Device):
                         elif block[i]['object'].package_type == 1 and block[i]['object'].package_type_by_receipt == 2:
                             block[i]['object'].issue_list['type'] = 9
                             add_template(block[i])
+
+                else: # упаковки, которые были одни в группе отмечаются как КПУ неоплаченная
+                    block[i]['object'].csp = True
+                    block[i]['object'].unpaid = True
+                    block[i]['object'].to_account = True
+                    block[i]['object'].issue_list['type'] = 7
+                    add_template(block[i])
             i += 1
     # create_csv(device)
     asyncio.gather(update_database(device))
