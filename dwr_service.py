@@ -194,12 +194,12 @@ def adding_attributes(device):
     for block in device.broken_line_event:
         i = 0
         while len(block) > i:
-            if block[i]['type'] == 'suitcase_start' and \
+            if len(block) > i+1 and block[i]['type'] == 'suitcase_start' and \
             block[i+1]['type'] == 'suitcase_finish':
                 block[i]['object'].csp = True
                 block[i]['object'].unpaid = False
                 block[i]['object'].to_account = True
-            elif block[i]['type'] == 'suitcase_start' and \
+            elif len(block) > i+1 and block[i]['type'] == 'suitcase_start' and \
             block[i+1]['type'] != 'suitcase_finish':
                 block[i]['object'].csp = False
                 block[i]['object'].unpaid = True
