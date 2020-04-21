@@ -39,34 +39,38 @@ async def run_app(request:Request):
         device.issue_list = await request.get_issue(device.device_id)
         device.receipts_list = await request.get_receipts(device.device_id)
         device.suitcases_list = await request.get_suitcases(device.device_id)
-        for alarm in device.alarm_list:
-            device.line_event.append(
-                {'time': alarm.alarm_time,
-                 'object': alarm,
-                 'type': 'alarm'
-                }
-            )
-        for issue in device.issue_list:
-            device.line_event.append(
-                {'time': issue.issue_time,
-                 'object': issue,
-                 'type': 'issue'
-                }
-            )
-        for receipt in device.receipts_list:
-            device.line_event.append(
-                {'time': receipt.receipts_timestamp,
-                 'object': receipt,
-                 'type': 'receipt'
-                }
-            )
-        for suitcase in device.suitcases_list:
-            device.line_event.append(
-                {'time': suitcase.suitcase_start,
-                 'object': suitcase,
-                 'type': 'suitcase_start'
-                }
-            )
+        if device.alarm_list:
+            for alarm in device.alarm_list:
+                device.line_event.append(
+                    {'time': alarm.alarm_time,
+                    'object': alarm,
+                    'type': 'alarm'
+                    }
+                )
+        if device.issue_list:
+            for issue in device.issue_list:
+                device.line_event.append(
+                    {'time': issue.issue_time,
+                    'object': issue,
+                    'type': 'issue'
+                    }
+                )
+        if device.receipts_list:
+            for receipt in device.receipts_list:
+                device.line_event.append(
+                    {'time': receipt.receipts_timestamp,
+                    'object': receipt,
+                    'type': 'receipt'
+                    }
+                )
+        if device.suitcases_list:
+            for suitcase in device.suitcases_list:
+                device.line_event.append(
+                    {'time': suitcase.suitcase_start,
+                    'object': suitcase,
+                    'type': 'suitcase_start'
+                    }
+                )
             device.line_event.append(
                 {'time': suitcase.suitcase_finish,
                  'object': suitcase,
