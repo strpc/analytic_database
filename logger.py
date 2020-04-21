@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import logging
 import logging.handlers as handlers
@@ -9,7 +10,7 @@ if not os.path.exists(os.path.join(os.getcwd(), DIR_NAME_LOG)):
     try:
         os.mkdir(os.path.join(os.getcwd(), DIR_NAME_LOG))
     except Exception as e:
-        logger.error('Ошибка при создании папок для логов; {0}'.format(e))
+        logging.error('Ошибка при создании папок для логов; {0}'.format(e))
 
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
