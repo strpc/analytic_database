@@ -9,12 +9,13 @@ import logger
 class Alarm():
     '''Класс, содержащий информацию о уведомлениях'''
     def __init__(self, polycommalarm_id, alarm_time,
-                 alarm_device_id, alarm_type, status):
+                 alarm_device_id, alarm_type, status, moscow_date):
         self.polycommalarm_id = polycommalarm_id
         self.alarm_time = alarm_time
         self.alarm_device_id = alarm_device_id
         self.alarm_type = alarm_type
         self.status = status
+        self.moscow_date = moscow_date
 
     def __str__(self):
         return f'{self.alarm_type}'
@@ -53,13 +54,14 @@ class Device():
 class Issue():
     '''Класс, содержащий информацию о оповещениях.'''
     def __init__(self, suitcase_id, issue_time, device_id, issue_type, status,
-                 polycommissue_id):
+                 polycommissue_id, moscow_date):
         self.suitcase_id = suitcase_id
         self.issue_time = issue_time
         self.device_id = device_id
         self.issue_type = issue_type
         self.status = status
         self.polycommissue_id = polycommissue_id
+        self.moscow_date = moscow_date
 
     def __str__(self):
         return f'{self.issue_type}'
@@ -93,7 +95,7 @@ class Receipts():
 class Suitcase():
     '''Класс, содержащий информацию о упаковках'''
     def __init__(self, suitcase_id, suitcase_start, suitcase_finish,
-                 package_type, polycom_id, totalid, status, duration, device_id):
+                 package_type, polycom_id, totalid, status, duration, moscow_date, device_id):
         self.device_id = device_id
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
@@ -115,6 +117,7 @@ class Suitcase():
         }
         self.status = status
         self.duration = duration
+        self.moscow_date = moscow_date
 
     def __str__(self):
         return f'polycom_id: {self.polycom_id}, package_type suitcase: \
@@ -166,8 +169,8 @@ class Request():
                     INNER JOIN timestamps ON \
                     polycomm_device.code = CAST(timestamps.devicecode as int) \
                     and timestamps.ready = True \
-                    and timestamps.status_type_device = $1 \
-                    ORDER BY id;', status_type_device)
+                    and timestamps.status_type_device = $1;',
+                    status_type_device)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка активных'
                               ' устройств из базы. Метод get_devices', e)
@@ -194,14 +197,12 @@ class Request():
             try:
                 rows = await conn.fetch("\
                     SELECT polycommalarm_id, localdate, device, \
-                        polycomm_alarm_type.title, polycommalarm.status \
+                        polycomm_alarm_type.title, polycommalarm.status, date \
                     FROM polycommalarm \
                     INNER JOIN polycomm_alarm_type ON \
                         polycomm_alarm_type.id = polycommalarm.alarmtype \
                     WHERE device = $1 \
-                        and status = 0 \
-                    ORDER BY localdate \
-                    ", device_id)
+                        and status = 0;", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'уведомлений из базы. Метод get_alarm', e)
@@ -216,7 +217,8 @@ class Request():
                 alarm_time=row['localdate'],
                 alarm_device_id=row['device'],
                 alarm_type=row['title'],
-                status=row['status']
+                status=row['status'],
+                moscow_date=row['date']
                                     ))
         return alarm_list.copy()
 
@@ -234,14 +236,12 @@ class Request():
             try:
                 rows = await conn.fetch("\
                     SELECT suitcase, localdate, device, polycomm_issue_type.title, \
-                        status, polycommissue_id \
+                        status, polycommissue_id, date \
                     FROM polycommissue \
                     INNER JOIN polycomm_issue_type ON \
                         polycommissue.type = polycomm_issue_type.id \
                     WHERE device = $1 \
-                        and status = 0 \
-                    ORDER BY localdate \
-                    ", device_id)
+                        and status = 0;", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'оповещений из базы. Метод get_issue', e)
@@ -256,7 +256,8 @@ class Request():
                                 device_id=row['device'],
                                 issue_type=row['title'],
                                 status=row['status'],
-                                polycommissue_id=row['polycommissue_id']
+                                polycommissue_id=row['polycommissue_id'],
+                                moscow_date=row['date']
                                 ))
         return issue_list.copy()
 
@@ -280,8 +281,7 @@ class Request():
                 LEFT JOIN polycomm_device on \
                     CAST(receipts.devicecode as int) = polycomm_device.code \
                 WHERE polycomm_device.id = $1 \
-                    and status = 0 \
-                ORDER BY dateclose", device_id)
+                    and status = 0;", device_id)
             except Exception as e:
                 logger.create('Произошла ошибка при получении списка '
                               'чеков из базы. Метод get_receipts', e)
@@ -314,7 +314,7 @@ class Request():
             try:
                 rows = await conn.fetch("\
                 SELECT id, dateini_local, local_date, package_type,\
-                    polycom_id, totalid, status, duration\
+                    polycom_id, totalid, status, duration, date\
                 FROM polycomm_suitcase\
                 WHERE status = 0 and device_id = $1;", device_id)
             except Exception as e:
@@ -334,6 +334,7 @@ class Request():
                                         totalid=row['totalid'],
                                         status=row['status'],
                                         duration=row['duration'],
+                                        moscow_date=row['date'],
                                         device_id=device_id)
                                 )
         return suitcases_list.copy()
@@ -370,6 +371,7 @@ class Request():
                     event.issue_list['date'],
                     datetime.now())
                 await conn.close()
+                # print('issue created') #FIXME
             except Exception as e:
                 logger.create('Произошла ошибка при создании записи '
                               'в сущности polycommissue. '
@@ -435,6 +437,7 @@ class Request():
                     to_task_event['task_id']
                     )
                 await conn.close()
+                # print('task_to_event created') #FIXME
                 return parent_id
             except Exception as e:
                 logger.create('Произошла ошибка при создании записи '
@@ -466,7 +469,7 @@ class Request():
                 event['object'].to_account,
                 event['object'].polycom_id
                 )
-                # print('suitcase') #FIXME:
+                # print('suitcase status is updated') #FIXME
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycomm_suitcase. Метод update_status',
@@ -484,7 +487,7 @@ class Request():
                 event['object'].status,
                 event['object'].polycommalarm_id
                 )
-                # print('alarm') #FIXME:
+                # print('alarm status is updated') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycommalarm. Метод update_status',
@@ -501,7 +504,7 @@ class Request():
                 event['object'].status,
                 event['object'].polycommissue_id
                 )
-                # print('issue') #FIXME:
+                # print('issue status is updated') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности polycommissue. Метод update_status',
@@ -518,7 +521,7 @@ class Request():
                 event['object'].status,
                 event['object'].receipt_id
                 )
-                # print('receipt') #FIXME:
+                # print('receipt status is updated') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности receipts. Метод update_status', e)
@@ -532,7 +535,7 @@ class Request():
                 SET status = 1 \
                 WHERE id = $1;", task_id
                 )
-                # print('task_id') #FIXME:
+                # print('task_id status is updated') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности task. Метод update_status', e)
@@ -555,7 +558,7 @@ class Request():
                 SET status = 1, resolved = True \
                 WHERE id = $1;", task_id
                 )
-                # print('task_id') #FIXME:
+                # print('task_id status and resolved is updated') #FIXME:
             except Exception as e:
                 logger.create('Произошла ошибка при обновлении записи в '
                               'сущности task. Метод update_status_and_resolved',
