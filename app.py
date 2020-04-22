@@ -39,6 +39,31 @@ async def run_app(request:Request):
         device.issue_list = await request.get_issue(device.device_id)
         device.receipts_list = await request.get_receipts(device.device_id)
         device.suitcases_list = await request.get_suitcases(device.device_id)
+
+        alarm_list_temp = []
+        if device.alarm_list and device.suitcases_list:
+            for alarm in device.alarm_list:
+                for suitcase in device.suitcases_list:
+                    if alarm.alarm_time > suitcase.suitcase_start and \
+                    alarm.alarm_time < suitcase.suitcase_finish:
+                        suitcase.alarm_list.append(alarm)
+                    else:
+                        alarm_list_temp.append(alarm)
+            device.alarm_list = alarm_list_temp
+
+        issue_list_temp = []
+        if device.issue_list and device.suitcases_list:
+            for issue in device.issue_list:
+                for suitcase in device.suitcases_list:
+                    if issue.issue_time > suitcase.suitcase_start and \
+                    issue.issue_time < suitcase.suitcase_finish:
+                        suitcase.issue_list.append(issue)
+                    else:
+                        logger.create(f'Уведомлению не нашлось упаковки id: '
+                        '{issue.polycommissue_id}, device_id: {device.device_id}')
+                        issue_list_temp.append(issue)
+            device.issue_list = issue_list_temp
+
         if device.alarm_list:
             for alarm in device.alarm_list:
                 device.line_event.append(
@@ -71,22 +96,23 @@ async def run_app(request:Request):
                     'type': 'suitcase_start'
                     }
                 )
-            device.line_event.append(
-                {'time': suitcase.suitcase_finish,
-                 'object': suitcase,
-                 'type': 'suitcase_finish'
-                }
+                device.line_event.append(
+                    {'time': suitcase.suitcase_finish,
+                    'object': suitcase,
+                    'type': 'suitcase_finish'
+                    }
             )
-        del (device.alarm_list, device.issue_list,
-             device.receipts_list, device.suitcases_list)
-        device.line_event.sort(key=lambda d: d['time'])
-        if device.line_event:
-            sort_receipts(device)
-        else:
-            logger.create('Цикл аналитики не был запущен, так как данные для обработки'
-                          ' не были загружены. Метод run_app. Возможно устройство'
-                          ' не работает. id устройства: {0}, название: {1}'.format(
-                                                device.device_id, device.name))
+
+        # del (device.alarm_list, device.issue_list,
+        #      device.receipts_list, device.suitcases_list)
+        # device.line_event.sort(key=lambda d: d['time'])
+        # if device.line_event:
+        #     sort_receipts(device)
+        # else:
+        #     logger.create('Цикл аналитики не был запущен, так как данные для обработки'
+        #                   ' не были загружены. Метод run_app. Возможно устройство'
+        #                   ' не работает. id устройства: {0}, название: {1}'.format(
+        #                                         device.device_id, device.name))
 
 
 def sort_receipts(device:Device):
@@ -486,11 +512,11 @@ def adding_attributes(device:Device):
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     def add_template(event):
-        event['object'].issue_list['id'] = 22222222
-        event['object'].issue_list['total'] = event['object'].totalid
-        event['object'].issue_list['suitcase'] = event['object'].polycom_id
-        event['object'].issue_list['date'] = event['object'].suitcase_finish
-        event['object'].issue_list['localdate'] = event['object'].suitcase_finish
+        event['object'].issue_attrib['id'] = 22222222
+        event['object'].issue_attrib['total'] = event['object'].totalid
+        event['object'].issue_attrib['suitcase'] = event['object'].polycom_id
+        event['object'].issue_attrib['date'] = event['object'].suitcase_finish
+        event['object'].issue_attrib['localdate'] = event['object'].suitcase_finish
 
 
 
@@ -505,7 +531,7 @@ def adding_attributes(device:Device):
                     block[i]['object'].csp = True
                     block[i]['object'].unpaid = True
                     block[i]['object'].to_account = True
-                    block[i]['object'].issue_list['type'] = 7
+                    block[i]['object'].issue_attrib['type'] = 7
                     add_template(block[i])
 
                 #КПУ оплаченная
@@ -515,11 +541,11 @@ def adding_attributes(device:Device):
                     block[i]['object'].to_account = True
 
                     if block[i]['object'].package_type_by_receipt == 1 and block[i]['object'].package_type == 2:
-                        block[i]['object'].issue_list['type'] = 8
+                        block[i]['object'].issue_attrib['type'] = 8
                         add_template(block[i])
 
                     elif block[i]['object'].package_type_by_receipt == 2 and block[i]['object'].package_type == 1:
-                        block[i]['object'].issue_list['type'] = 9
+                        block[i]['object'].issue_attrib['type'] = 9
                         add_template(block[i])
 
 
@@ -538,18 +564,18 @@ def adding_attributes(device:Device):
 
 
                         if block[i]['object'].package_type == 2 and block[i]['object'].package_type_by_receipt == 1:
-                            block[i]['object'].issue_list['type'] = 8
+                            block[i]['object'].issue_attrib['type'] = 8
                             add_template(block[i])
 
                         elif block[i]['object'].package_type == 1 and block[i]['object'].package_type_by_receipt == 2:
-                            block[i]['object'].issue_list['type'] = 9
+                            block[i]['object'].issue_attrib['type'] = 9
                             add_template(block[i])
 
                 else: # упаковки, которые были одни в группе отмечаются как КПУ неоплаченная
                     block[i]['object'].csp = True
                     block[i]['object'].unpaid = True
                     block[i]['object'].to_account = True
-                    block[i]['object'].issue_list['type'] = 7
+                    block[i]['object'].issue_attrib['type'] = 7
                     add_template(block[i])
             i += 1
     # create_csv(device)
@@ -582,7 +608,7 @@ async def update_database(device:Device):
         i = 0
         while len(block) > i:
             if block[i]['type'] == 'suitcase_start' and \
-            block[i]['object'].issue_list.get('type') in {7, 8, 9}:
+            block[i]['object'].issue_attrib.get('type') in {7, 8, 9}:
                 await request.create_polycommissue_event(block[i]['object'])
             if block[i]['type'] == 'suitcase_start':
                 block[i]['object'].status = 1
@@ -741,12 +767,12 @@ def create_csv(device:Device):
 
                 elif i['type'] == 'suitcase_start':
                     writer.writerow(('', i['time'], 'НАЧАЛО УПАКОВКИ', f"ТИП УПАКОВКИ: {i['object'].package_type}", f"номер чека: {i['object'].receipt_id}", f"тип чека: {i['object'].package_type_by_receipt}", f"polycom_id = {i['object'].polycom_id}"))
-                    if i['object'].issue_list.get('id'):
-                        writer.writerow((f"id: {i['object'].issue_list['id']}",
-                                        f"total: {i['object'].issue_list['total']}",
-                                        f"suitcase: {i['object'].issue_list['suitcase']}",f"date: {i['object'].issue_list['date']}",
-                                        f"localdate: {i['object'].issue_list['localdate']}"))
-                        writer.writerow((f"type: {i['object'].issue_list['type']}",))
+                    if i['object'].issue_attrib.get('id'):
+                        writer.writerow((f"id: {i['object'].issue_attrib['id']}",
+                                        f"total: {i['object'].issue_attrib['total']}",
+                                        f"suitcase: {i['object'].issue_attrib['suitcase']}",f"date: {i['object'].issue_attrib['date']}",
+                                        f"localdate: {i['object'].issue_attrib['localdate']}"))
+                        writer.writerow((f"type: {i['object'].issue_attrib['type']}",))
 
                     writer.writerow((f"csp: {i['object'].csp}",
                                     f"unpaid: {i['object'].unpaid}",
