@@ -83,8 +83,10 @@ async def run_app(request:Request):
         if device.line_event:
             sort_receipts(device)
         else:
-            logger.create('Программа была прервана, так как данные для обработки'
-                          ' не были загружены. Метод run_app')
+            logger.create('Цикл аналитики не был запущен, так как данные для обработки'
+                          ' не были загружены. Метод run_app. Возможно устройство'
+                          ' не работает. id устройства: {0}, название: {1}'.format(
+                                                device.device_id, device.name))
 
 
 def sort_receipts(device:Device):
@@ -597,12 +599,22 @@ async def update_database(device:Device):
 
 
         # task data:
-        if block[-1]['type'] == 'receipt':
+        if block[-1]['type'] == 'alarm':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].alarm_time
+
+        elif block[-1]['type'] == 'issue':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].issue_time
+
+        elif block[-1]['type'] == 'suitcase_start':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].suitcase_finish
+
+        elif block[-1]['type'] == 'receipt':
             to_task['date'] = block[-1]['object'].dateclosemoscow
             to_task['local_date'] = block[-1]['object'].receipts_timestamp
-        else:
-            to_task['date'] = datetime.now()
-            to_task['local_date'] = datetime.now()
+
         to_task['device_id'] = device.device_id
         to_task['type'] = device.task_type.get(block[0]['task_type'])
         to_task_event['task_id'] = await request.create_task(to_task)

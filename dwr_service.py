@@ -47,9 +47,16 @@ async def run_app(request:Request):
                  'type': 'suitcase_finish'
                 }
             )
-        del device.alarm_list, device.issue_list, device.suitcases_list #NOTE: optimization memory
+        del device.alarm_list, device.issue_list, device.suitcases_list
         device.line_event.sort(key=lambda d: d['time'])
-        grouping_events(device)
+        if device.line_event:
+            grouping_events(device)
+        else:
+            logger.create('Цикл аналитики машин без чеков не был запущен, так'
+                          ' как данные для обработки не были загружены.'
+                          ' Метод run_app. Возможно устройство не работает.'
+                          ' id устройства: {0}, название: {1}'.format(
+                                                device.device_id, device.name))
 
 
 def grouping_events(device:Device):
@@ -234,12 +241,18 @@ async def update_database(device:Device):
         }
 
         # task data:
-        if block[-1]['type'] != 'none':
-            to_task['date'] = block[-1]['time']
-            to_task['local_date'] = block[-1]['time']
-        else:
-            to_task['date'] = datetime.now()
-            to_task['local_date'] = datetime.now()
+        if block[-1]['type'] == 'alarm':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].alarm_time
+
+        elif block[-1]['type'] == 'issue':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].issue_time
+
+        elif block[-1]['type'] == 'suitcase_start':
+            to_task['date'] = block[-1]['object'].moscow_date
+            to_task['local_date'] = block[-1]['object'].suitcase_finish
+
         to_task['device_id'] = device.device_id
         to_task['type'] = device.task_type.get(block[0]['task_type'])
         to_task_event['task_id'] = await device.request.create_task(to_task)
