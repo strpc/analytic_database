@@ -49,7 +49,8 @@ async def run_app(request:Request):
                         suitcase.alarm_list.append(alarm)
                     else:
                         alarm_list_temp.append(alarm)
-            device.alarm_list = alarm_list_temp
+            device.alarm_list = set(alarm_list_temp)
+            del alarm_list_temp
 
         issue_list_temp = []
         if device.issue_list and device.suitcases_list:
@@ -59,10 +60,13 @@ async def run_app(request:Request):
                     issue.issue_time < suitcase.suitcase_finish:
                         suitcase.issue_list.append(issue)
                     else:
-                        logger.create(f'Уведомлению не нашлось упаковки id: '
-                        '{issue.polycommissue_id}, device_id: {device.device_id}')
                         issue_list_temp.append(issue)
-            device.issue_list = issue_list_temp
+            device.issue_list = set(issue_list_temp)
+            del issue_list_temp
+
+            for issue in device.issue_list:
+                logger.create('Уведомлению не нашлось упаковки id: '
+                f'{issue.polycommissue_id}, device_id: {device.device_id}')
 
         if device.alarm_list:
             for alarm in device.alarm_list:
@@ -103,16 +107,16 @@ async def run_app(request:Request):
                     }
             )
 
-        # del (device.alarm_list, device.issue_list,
-        #      device.receipts_list, device.suitcases_list)
-        # device.line_event.sort(key=lambda d: d['time'])
-        # if device.line_event:
-        #     sort_receipts(device)
-        # else:
-        #     logger.create('Цикл аналитики не был запущен, так как данные для обработки'
-        #                   ' не были загружены. Метод run_app. Возможно устройство'
-        #                   ' не работает. id устройства: {0}, название: {1}'.format(
-        #                                         device.device_id, device.name))
+        del (device.alarm_list, device.issue_list,
+             device.receipts_list, device.suitcases_list)
+        device.line_event.sort(key=lambda d: d['time'])
+        if device.line_event:
+            sort_receipts(device)
+        else:
+            logger.create('Цикл аналитики не был запущен, так как данные для обработки'
+                          ' не были загружены. Метод run_app. Возможно устройство'
+                          ' не работает. id устройства: {0}, название: {1}'.format(
+                                                device.device_id, device.name))
 
 
 def sort_receipts(device:Device):
@@ -519,65 +523,61 @@ def adding_attributes(device:Device):
         event['object'].issue_attrib['localdate'] = event['object'].suitcase_finish
 
 
-
     for block in device.broken_line_event:
 
-        i = 0
-        while len(block) > i:
-            if block[i]['type'] == 'suitcase_start':
+        for event in block:
+            if event['type'] == 'suitcase_start':
 
                  # КПУ неоплаченная:
-                if len(block) > i+1 and block[i]['object'].receipt_id == -1 and block[i+1]['type'] not in {'alarm', 'issue'}:
-                    block[i]['object'].csp = True
-                    block[i]['object'].unpaid = True
-                    block[i]['object'].to_account = True
-                    block[i]['object'].issue_attrib['type'] = 7
-                    add_template(block[i])
+                if event['object'].receipt_id == -1 and not event['object'].issue_list and not event['object'].alarm_list:
+                    event['object'].csp = True
+                    event['object'].unpaid = True
+                    event['object'].to_account = True
+                    event['object'].issue_attrib['type'] = 7
+                    add_template(event)
 
                 #КПУ оплаченная
-                elif len(block) > i+1 and block[i]['object'].receipt_id not in {-1, None} and block[i+1]['type'] not in {'alarm', 'issue'}:
-                    block[i]['object'].csp = True
-                    block[i]['object'].unpaid = False
-                    block[i]['object'].to_account = True
+                elif event['object'].receipt_id not in {-1, None} and not event['object'].issue_list and not event['object'].alarm_list:
+                    event['object'].csp = True
+                    event['object'].unpaid = False
+                    event['object'].to_account = True
 
-                    if block[i]['object'].package_type_by_receipt == 1 and block[i]['object'].package_type == 2:
-                        block[i]['object'].issue_attrib['type'] = 8
-                        add_template(block[i])
+                    if event['object'].package_type_by_receipt == 1 and event['object'].package_type == 2:
+                        event['object'].issue_attrib['type'] = 8
+                        add_template(event)
 
-                    elif block[i]['object'].package_type_by_receipt == 2 and block[i]['object'].package_type == 1:
-                        block[i]['object'].issue_attrib['type'] = 9
-                        add_template(block[i])
+                    elif event['object'].package_type_by_receipt == 2 and event['object'].package_type == 1:
+                        event['object'].issue_attrib['type'] = 9
+                        add_template(event)
 
+                elif event['object'].issue_list or event['object'].alarm_list:
+                    #КнПУ и неоплаченная
+                    if event['object'].receipt_id == -1:
+                        event['object'].csp = False
+                        event['object'].unpaid = True
+                        event['object'].to_account = False
 
-                elif len(block) > i+1 and block[i+1]['type'] in {'alarm', 'issue'}:
-                    if block[i]['object'].receipt_id == -1:  #КнПУ и неоплаченная
-                        block[i]['object'].csp = False
-                        block[i]['object'].unpaid = True
-                        block[i]['object'].to_account = False
+                    #КПУ оплаченная
+                    elif event['object'].receipt_id != -1:
+                        event['object'].csp = True
+                        event['object'].unpaid = False
+                        event['object'].to_account = True
 
+                        if event['object'].package_type == 2 and event['object'].package_type_by_receipt == 1:
+                            event['object'].issue_attrib['type'] = 8
+                            add_template(event)
 
-                    elif block[i]['object'].receipt_id != -1:  #КПУ оплаченная
+                        elif event['object'].package_type == 1 and event['object'].package_type_by_receipt == 2:
+                            event['object'].issue_attrib['type'] = 9
+                            add_template(event)
 
-                        block[i]['object'].csp = True
-                        block[i]['object'].unpaid = False
-                        block[i]['object'].to_account = True
+                else: # подстраховка
+                    event['object'].csp = True
+                    event['object'].unpaid = True
+                    event['object'].to_account = True
+                    event['object'].issue_attrib['type'] = 7
+                    add_template(event)
 
-
-                        if block[i]['object'].package_type == 2 and block[i]['object'].package_type_by_receipt == 1:
-                            block[i]['object'].issue_attrib['type'] = 8
-                            add_template(block[i])
-
-                        elif block[i]['object'].package_type == 1 and block[i]['object'].package_type_by_receipt == 2:
-                            block[i]['object'].issue_attrib['type'] = 9
-                            add_template(block[i])
-
-                else: # упаковки, которые были одни в группе отмечаются как КПУ неоплаченная
-                    block[i]['object'].csp = True
-                    block[i]['object'].unpaid = True
-                    block[i]['object'].to_account = True
-                    block[i]['object'].issue_attrib['type'] = 7
-                    add_template(block[i])
-            i += 1
     # create_csv(device)
     asyncio.gather(update_database(device))
 
@@ -633,7 +633,8 @@ async def update_database(device:Device):
             to_task['date'] = block[-1]['object'].moscow_date
             to_task['local_date'] = block[-1]['object'].issue_time
 
-        elif block[-1]['type'] == 'suitcase_start':
+        elif block[-1]['type'] == 'suitcase_start' or \
+        block[-1]['type'] == 'suitcase_finish':
             to_task['date'] = block[-1]['object'].moscow_date
             to_task['local_date'] = block[-1]['object'].suitcase_finish
 
@@ -810,7 +811,6 @@ if __name__ == '__main__':
         # t1 = time()
 
         asyncio.run(run_app(request))
-        print('with receipts is done')
         if DEVICE_WITHOUT_RECEIPTS:
             asyncio.run(dwr_service.run_app(request))
         sleep(TIME_SLEEP)
