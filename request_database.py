@@ -18,10 +18,10 @@ class Alarm():
         self.moscow_date = moscow_date
 
     def __str__(self):
-        return f'{self.alarm_type}'
+        return f'{self.alarm_type, self.alarm_time}'
 
     def __repr__(self):
-        return f'{self.alarm_type}'
+        return f'{self.alarm_type, self.alarm_time}'
 
 
 class Device():
@@ -64,10 +64,10 @@ class Issue():
         self.moscow_date = moscow_date
 
     def __str__(self):
-        return f'{self.issue_type}'
+        return f'time: {self.issue_time}, {self.issue_type}'
 
     def __repr__(self):
-        return f'{self.issue_type}'
+        return f'time: {self.issue_time}, {self.issue_type}'
 
 
 class Receipts():
@@ -86,16 +86,21 @@ class Receipts():
         self.dateclosemoscow = dateclosemoscow
 
     def __str__(self):
-        return f'quantitypackageone: {self.quantitypackageone}'
+        return f'receipt_id: {self.receipt_id}, quantitypackageone: \
+{self.quantitypackageone}, quantitypackagedouble: {self.quantitypackagedouble},\
+time: {self.receipts_timestamp}'
 
     def __repr__(self):
-        return f'quantitypackagedouble: {self.quantitypackagedouble}'
+        return f'receipt_id: {self.receipt_id}, quantitypackageone: \
+{self.quantitypackageone}, quantitypackagedouble: {self.quantitypackagedouble},\
+time: {self.receipts_timestamp}'
 
 
 class Suitcase():
     '''Класс, содержащий информацию о упаковках'''
     def __init__(self, suitcase_id, suitcase_start, suitcase_finish,
-                 package_type, polycom_id, totalid, status, duration, moscow_date, device_id):
+                 package_type, polycom_id, totalid, status, duration,
+                 moscow_date, device_id):
         self.device_id = device_id
         self.suitcase_id = suitcase_id
         self.suitcase_start = suitcase_start
@@ -108,7 +113,7 @@ class Suitcase():
         self.csp = str()
         self.unpaid = str()
         self.to_account = str()
-        self.issue_list = {
+        self.issue_attrib = {
             'id': '',
             'total': '',
             'suitcase': '',
@@ -118,14 +123,18 @@ class Suitcase():
         self.status = status
         self.duration = duration
         self.moscow_date = moscow_date
+        self.alarm_list = []
+        self.issue_list = []
 
     def __str__(self):
         return f'polycom_id: {self.polycom_id}, package_type suitcase: \
-{self.package_type}, suitcase_start: {self.suitcase_start}'
+{self.package_type}, suitcase_start: {self.suitcase_start}, \
+finish: {self.suitcase_finish}'
 
     def __repr__(self):
         return f'polycom_id: {self.polycom_id}, package_type suitcase: \
-{self.package_type}, suitcase_start: {self.suitcase_start}'
+{self.package_type}, suitcase_start: {self.suitcase_start}, \
+finish: {self.suitcase_finish}'
 
 
 class Request():
@@ -343,7 +352,7 @@ class Request():
     async def create_polycommissue_event(self, event):
         '''
         Создание записи в таблице polycommissue.
-        Suitcase.issue_list['type'] in {7, 8, 9}
+        Suitcase.issue_attrib['type'] in {7, 8, 9}
 
         :param event: - упаковка, с искусственным оповещением.
         '''
@@ -361,14 +370,14 @@ class Request():
                                         date, \
                                         createtime) \
                 VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);",
-                    event.issue_list['id'],
-                    event.issue_list['localdate'],
+                    event.issue_attrib['id'],
+                    event.issue_attrib['localdate'],
                     event.device_id,
-                    event.issue_list['total'],
-                    event.issue_list['suitcase'],
+                    event.issue_attrib['total'],
+                    event.issue_attrib['suitcase'],
                     event.duration,
-                    event.issue_list['type'],
-                    event.issue_list['date'],
+                    event.issue_attrib['type'],
+                    event.issue_attrib['date'],
                     datetime.now())
                 await conn.close()
                 # print('issue created') #FIXME
