@@ -2,6 +2,7 @@ import asyncio
 from datetime import timedelta, datetime
 import csv
 
+import logger
 from request_database import Request, Device
 from config import TIMEDELTA_CHECK, LAST_EVENT_TIME
 
@@ -19,6 +20,34 @@ async def run_app(request:Request):
         device.alarm_list = await request.get_alarm(device.device_id)
         device.issue_list = await request.get_issue(device.device_id)
         device.suitcases_list = await request.get_suitcases(device.device_id)
+
+        alarm_list_temp = []
+        if device.alarm_list and device.suitcases_list:
+            for alarm in device.alarm_list:
+                for suitcase in device.suitcases_list:
+                    if alarm.alarm_time > suitcase.suitcase_start and \
+                    alarm.alarm_time < suitcase.suitcase_finish:
+                        suitcase.alarm_list.append(alarm)
+                    else:
+                        alarm_list_temp.append(alarm)
+            device.alarm_list = set(alarm_list_temp)
+            del alarm_list_temp
+
+        issue_list_temp = []
+        if device.issue_list and device.suitcases_list:
+            for issue in device.issue_list:
+                for suitcase in device.suitcases_list:
+                    if issue.issue_time > suitcase.suitcase_start and \
+                    issue.issue_time < suitcase.suitcase_finish:
+                        suitcase.issue_list.append(issue)
+                    else:
+                        issue_list_temp.append(issue)
+            device.issue_list = set(issue_list_temp)
+            del issue_list_temp
+
+            for issue in device.issue_list:
+                logger.create('Уведомлению не нашлось упаковки id: '
+                f'{issue.polycommissue_id}, device_id: {device.device_id}')
 
         for alarm in device.alarm_list:
             device.line_event.append(
@@ -141,8 +170,13 @@ def check_broked_events(device:Device):
         for event in block:
             if event['type'] == 'issue':
                 issues += 1
-            if event['type'] == 'alarm':
+            elif event['type'] == 'alarm':
                 alarms += 1
+            elif event['type'] == 'suitcase_start' and event['object'].issue_list:
+                issues += len(event['object'].issue_list)
+            elif event['type'] == 'suitcase_start' and event['object'].alarm_list:
+                issues += len(event['object'].alarm_list)
+
 
         if issues != 0 or alarms != 0:
             broken_line_event.append(block)
@@ -199,19 +233,16 @@ def adding_attributes(device):
     :param device: элемент списка экземпляров активных устройств класса Device.
     '''
     for block in device.broken_line_event:
-        i = 0
-        while len(block) > i:
-            if len(block) > i+1 and block[i]['type'] == 'suitcase_start' and \
-            block[i+1]['type'] == 'suitcase_finish':
-                block[i]['object'].csp = True
-                block[i]['object'].unpaid = False
-                block[i]['object'].to_account = True
-            elif len(block) > i+1 and block[i]['type'] == 'suitcase_start' and \
-            block[i+1]['type'] != 'suitcase_finish':
-                block[i]['object'].csp = False
-                block[i]['object'].unpaid = True
-                block[i]['object'].to_account = False
-            i += 1
+        for event in block:
+            if event['type'] == 'suitcase_start' and not event['object'].issue_list and not event['object'].alarm_list:
+                event['object'].csp = True
+                event['object'].unpaid = False
+                event['object'].to_account = True
+            elif event['type'] == 'suitcase_start' and (event['object'].issue_list or event['object'].alarm_list):
+                event['object'].csp = False
+                event['object'].unpaid = True
+                event['object'].to_account = False
+
     asyncio.gather(update_database(device))
 
 
