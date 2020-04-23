@@ -61,12 +61,11 @@ async def run_app(request:Request):
                         suitcase.issue_list.append(issue)
                     else:
                         issue_list_temp.append(issue)
-            device.issue_list = set(issue_list_temp)
-            del issue_list_temp
-
+            issue_list_temp = set(issue_list_temp)
             for issue in device.issue_list:
                 logger.create('Уведомлению не нашлось упаковки id: '
                 f'{issue.polycommissue_id}, device_id: {device.device_id}')
+            del issue_list_temp
 
         if device.alarm_list:
             for alarm in device.alarm_list:
@@ -74,14 +73,6 @@ async def run_app(request:Request):
                     {'time': alarm.alarm_time,
                     'object': alarm,
                     'type': 'alarm'
-                    }
-                )
-        if device.issue_list:
-            for issue in device.issue_list:
-                device.line_event.append(
-                    {'time': issue.issue_time,
-                    'object': issue,
-                    'type': 'issue'
                     }
                 )
         if device.receipts_list:
@@ -613,6 +604,14 @@ async def update_database(device:Device):
             if block[i]['type'] == 'suitcase_start':
                 block[i]['object'].status = 1
 
+                if block[i]['object'].alarm_list:
+                    for alarm in block[i]['object'].alarm_list:
+                        alarm.status = 1
+
+                if block[i]['object'].issue_list:
+                    for issue in block[i]['object'].issue_list:
+                        issue.status = 1
+
             elif block[i]['type'] in {'alarm', 'issue'}:
                 block[i]['object'].status = 1
             elif block[i]['type'] == 'receipt':
@@ -654,6 +653,26 @@ async def update_database(device:Device):
                 to_task_event['table_name'] = 'polycomm_suitcase'
                 to_task_event['ord'] += 1
                 to_task_event['parent_id'] = await request.create_task_to_event(to_task_event)
+
+                if event['object'].alarm_list:
+                    for alarm in event['object'].alarm_list:
+                        print(alarm)
+                        to_task_event['event_id'] = alarm.polycommalarm_id
+                        to_task_event['table_name'] = 'polycommalarm'
+                        to_task_event['ord'] += 1
+                        await request.create_task_to_event(to_task_event)
+                        await request.update_status(event=alarm)
+                        print('\n\nalarm in suitcase\n\n')
+
+                if event['object'].issue_list:
+                        for issue in event['object'].issue_list:
+                            print(issue)
+                            to_task_event['event_id'] = issue.polycommissue_id
+                            to_task_event['table_name'] = 'polycommissue'
+                            to_task_event['ord'] += 1
+                            await request.create_task_to_event(to_task_event)
+                            await request.update_status(event=issue)
+                            print('\n\nissue in suitcase\n\n')
 
             elif event['type'] == 'issue':
                 to_task_event['event_id'] = event['object'].polycommissue_id
@@ -700,6 +719,14 @@ async def update_database(device:Device):
             if event['type'] in {'suitcase_start', 'issue', 'alarm', 'receipt'}:
                 event['object'].status = 1
 
+            if event['type'] == 'suitcase_start' and event['object'].alarm_list:
+                for alarm in event['object'].alarm_list:
+                    alarm.status = 1
+
+            if event['type'] == 'suitcase_start' and event['object'].issue_list:
+                for issue in event['object'].issue_list:
+                    issue.status = 1
+
         # task data:
         if block[-1]['type'] == 'receipt':
             to_task['date'] = block[-1]['object'].dateclosemoscow
@@ -723,6 +750,25 @@ async def update_database(device:Device):
                 event['object'].unpaid = False
                 event['object'].in_task = False
                 event['object'].to_account = True
+
+                if event['object'].alarm_list:
+                    for alarm in event['object'].alarm_list:
+                        to_task_event['event_id'] = alarm.polycommalarm_id
+                        to_task_event['table_name'] = 'polycommalarm'
+                        to_task_event['ord'] += 1
+                        await request.create_task_to_event(to_task_event)
+                        await request.update_status(event=alarm)
+                        print('alarm in suitcase line event')
+
+                if event['object'].issue_list:
+                        for issue in event['object'].issue_list:
+                            print(issue)
+                            to_task_event['event_id'] = issue.polycommissue_id
+                            to_task_event['table_name'] = 'polycommissue'
+                            to_task_event['ord'] += 1
+                            await request.create_task_to_event(to_task_event)
+                            await request.update_status(event=issue)
+                            print('issue in suitcase line_event')
 
             elif event['type'] == 'issue':
                 to_task_event['event_id'] = event['object'].polycommissue_id

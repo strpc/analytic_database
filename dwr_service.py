@@ -42,25 +42,17 @@ async def run_app(request:Request):
                         suitcase.issue_list.append(issue)
                     else:
                         issue_list_temp.append(issue)
-            device.issue_list = set(issue_list_temp)
-            del issue_list_temp
-
+            issue_list_temp = set(issue_list_temp)
             for issue in device.issue_list:
                 logger.create('Уведомлению не нашлось упаковки id: '
                 f'{issue.polycommissue_id}, device_id: {device.device_id}')
+            del issue_list_temp
 
         for alarm in device.alarm_list:
             device.line_event.append(
                 {'time': alarm.alarm_time,
                  'object': alarm,
                  'type': 'alarm'
-                }
-            )
-        for issue in device.issue_list:
-            device.line_event.append(
-                {'time': issue.issue_time,
-                 'object': issue,
-                 'type': 'issue'
                 }
             )
         for suitcase in device.suitcases_list:
@@ -212,6 +204,12 @@ def add_task(device:Device):
             elif event['type'] == 'suitcase_start':
                 count_suitcase_start += 1
                 event['object'].status = 1
+                if event['object'].alarm_list:
+                    for alarm in event['object'].alarm_list:
+                        alarm.status = 1
+                if event['object'].issue_list:
+                    for issue in event['object'].issue_list:
+                        issue.status = 1
 
         if (count_alarm != 0 and count_suitcase_start == 0) or \
         (count_issue != 0 and count_suitcase_start == 0):
@@ -280,7 +278,7 @@ async def update_database(device:Device):
             to_task['date'] = block[-1]['object'].moscow_date
             to_task['local_date'] = block[-1]['object'].issue_time
 
-        elif block[-1]['type'] == 'suitcase_start':
+        elif block[-1]['type'] in {'suitcase_start', 'suitcase_finish'}:
             to_task['date'] = block[-1]['object'].moscow_date
             to_task['local_date'] = block[-1]['object'].suitcase_finish
 
@@ -297,6 +295,26 @@ async def update_database(device:Device):
                 to_task_event['table_name'] = 'polycomm_suitcase'
                 to_task_event['ord'] += 1
                 to_task_event['parent_id'] = await device.request.create_task_to_event(to_task_event)
+
+                if event['object'].alarm_list:
+                    for alarm in event['object'].alarm_list:
+                        print(alarm)
+                        to_task_event['event_id'] = alarm.polycommalarm_id
+                        to_task_event['table_name'] = 'polycommalarm'
+                        to_task_event['ord'] += 1
+                        await device.request.create_task_to_event(to_task_event)
+                        await device.request.update_status(event=alarm)
+                        print('alarm in suitcase')
+
+                if event['object'].issue_list:
+                        for issue in event['object'].issue_list:
+                            print(issue)
+                            to_task_event['event_id'] = issue.polycommissue_id
+                            to_task_event['table_name'] = 'polycommissue'
+                            to_task_event['ord'] += 1
+                            await device.request.create_task_to_event(to_task_event)
+                            await device.request.update_status(event=issue)
+                            print('issue in suitcase')
 
             elif event['type'] == 'issue':
                 to_task_event['event_id'] = event['object'].polycommissue_id
