@@ -465,91 +465,126 @@ class Request():
         '''
         conn = await self._connect_database()
 
-        if task_id == None and event['type'] == 'suitcase_start' and conn:
-            try:
-                await conn.execute("\
-                UPDATE polycomm_suitcase \
-                SET status = $1, csp = $2, unpaid = $3, in_task = True, \
-                    to_account = $4 \
-                WHERE polycom_id = $5;",
-                event['object'].status,
-                event['object'].csp,
-                event['object'].unpaid,
-                event['object'].to_account,
-                event['object'].polycom_id
-                )
-                # print('suitcase status is updated') #FIXME
-            except Exception as e:
-                logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycomm_suitcase. Метод update_status',
-                                                                            e)
-            finally:
-                await conn.close()
+        if isinstance(event, dict) and conn:
+            if task_id == None and event['type'] == 'suitcase_start':
+                try:
+                    await conn.execute("\
+                    UPDATE polycomm_suitcase \
+                    SET status = $1, csp = $2, unpaid = $3, in_task = True, \
+                        to_account = $4 \
+                    WHERE polycom_id = $5;",
+                    event['object'].status,
+                    event['object'].csp,
+                    event['object'].unpaid,
+                    event['object'].to_account,
+                    event['object'].polycom_id
+                    )
+                    # print('suitcase status is updated') #FIXME
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности polycomm_suitcase. Метод update_status',
+                                                                                e)
+                finally:
+                    await conn.close()
 
 
-        elif task_id == None and event['type'] == 'alarm' and conn:
-            try:
-                await conn.execute("\
-                UPDATE polycommalarm \
-                SET status = $1 \
-                WHERE polycommalarm_id = $2;",
-                event['object'].status,
-                event['object'].polycommalarm_id
-                )
-                # print('alarm status is updated') #FIXME:
-            except Exception as e:
-                logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycommalarm. Метод update_status',
-                                                                            e)
-            finally:
-                await conn.close()
+            elif task_id == None and event['type'] == 'alarm':
+                try:
+                    await conn.execute("\
+                    UPDATE polycommalarm \
+                    SET status = $1 \
+                    WHERE polycommalarm_id = $2;",
+                    event['object'].status,
+                    event['object'].polycommalarm_id
+                    )
+                    # print('alarm status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности polycommalarm. Метод update_status',
+                                                                                e)
+                finally:
+                    await conn.close()
 
-        elif task_id == None and event['type'] == 'issue' and conn:
-            try:
-                await conn.execute("\
-                UPDATE polycommissue \
-                SET status = $1 \
-                WHERE polycommissue_id = $2;",
-                event['object'].status,
-                event['object'].polycommissue_id
-                )
-                # print('issue status is updated') #FIXME:
-            except Exception as e:
-                logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности polycommissue. Метод update_status',
-                                                                            e)
-            finally:
-                await conn.close()
+            elif task_id == None and event['type'] == 'issue':
+                try:
+                    await conn.execute("\
+                    UPDATE polycommissue \
+                    SET status = $1 \
+                    WHERE polycommissue_id = $2;",
+                    event['object'].status,
+                    event['object'].polycommissue_id
+                    )
+                    # print('issue status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности polycommissue. Метод update_status',
+                                                                                e)
+                finally:
+                    await conn.close()
 
-        elif task_id == None and event['type'] == 'receipt' and conn:
-            try:
-                await conn.execute("\
-                UPDATE receipts \
-                SET status = $1 \
-                WHERE receipt_id = $2;",
-                event['object'].status,
-                event['object'].receipt_id
-                )
-                # print('receipt status is updated') #FIXME:
-            except Exception as e:
-                logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности receipts. Метод update_status', e)
-            finally:
-                await conn.close()
+            elif task_id == None and event['type'] == 'receipt':
+                try:
+                    await conn.execute("\
+                    UPDATE receipts \
+                    SET status = $1 \
+                    WHERE receipt_id = $2;",
+                    event['object'].status,
+                    event['object'].receipt_id
+                    )
+                    # print('receipt status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности receipts. Метод update_status', e)
+                finally:
+                    await conn.close()
+        else:
+            if task_id == None and isinstance(event, Alarm):
+                try:
+                    await conn.execute("\
+                    UPDATE polycommalarm \
+                    SET status = $1 \
+                    WHERE polycommalarm_id = $2;",
+                    event.status,
+                    event.polycommalarm_id
+                    )
+                    # print('alarm status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности polycommalarm, вложенной в упаковку.'
+                                'Метод update_status', e)
+                finally:
+                    await conn.close()
 
-        elif task_id != None and conn:
-            try:
-                await conn.execute("\
-                UPDATE task \
-                SET status = 1 \
-                WHERE id = $1;", task_id
-                )
-                # print('task_id status is updated') #FIXME:
-            except Exception as e:
-                logger.create('Произошла ошибка при обновлении записи в '
-                              'сущности task. Метод update_status', e)
-            finally:
-                await conn.close()
+            elif task_id == None and isinstance(event, Issue):
+                try:
+                    await conn.execute("\
+                    UPDATE polycommissue \
+                    SET status = $1 \
+                    WHERE polycommissue_id = $2;",
+                    event.status,
+                    event.polycommissue_id
+                    )
+                    # print('issue status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности polycommissue, вложенной в упаковку.'
+                                'Метод update_status', e)
+                finally:
+                    await conn.close()
+
+            elif task_id != None and conn:
+                try:
+                    await conn.execute("\
+                    UPDATE task \
+                    SET status = 1 \
+                    WHERE id = $1;", task_id
+                    )
+                    # print('task_id status is updated') #FIXME:
+                except Exception as e:
+                    logger.create('Произошла ошибка при обновлении записи в '
+                                'сущности task. Метод update_status', e)
+                finally:
+                    await conn.close()
 
 
     async def update_status_and_resolved(self, task_id):
