@@ -56,15 +56,15 @@
 | Элемент главного списка(группа) | Элемент второстепенного списка(словари-события внутри группы)
 -------------|-------------
  Группа  событий        |
-                        |{'time': '2020-01-01 01:00', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:02', 'object': Suitcase, 'type': 'suitcase_finish'}
-                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'}
-                        |{'time': '2020-01-01 01:07', 'object': Receipt, 'type': 'receipt'}
- Группа событий         |
-                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:08', 'object': Suitcase, 'type': 'suitcase_finish'}
-                        |{'time': '2020-01-01 01:09', 'object': Receipt, 'type': 'receipt'}
+ |                        |{'time': '2020-01-01 01:00', 'object': Suitcase, 'type': 'suitcase_start'}
+ |                        |{'time': '2020-01-01 01:02', 'object': Suitcase, 'type': 'suitcase_finish'}
+ |                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}
+ |                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'}
+ |                        |{'time': '2020-01-01 01:07', 'object': Receipt, 'type': 'receipt'}
+ | Группа событий         |
+ |                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_start'}
+ |                        |{'time': '2020-01-01 01:08', 'object': Suitcase, 'type': 'suitcase_finish'}
+ |                        |{'time': '2020-01-01 01:09', 'object': Receipt, 'type': 'receipt'}
 
 Далее вызывается функция `check_last_event_time`, которая на вход принимает экземпляр класса Device. Внутри функции осуществляется проверка на предмет того, что события, с которыми будет продолжена дальше работа произошли раньше, чем последние LAST_EVENT_TIME(константа из config.<span></span>py. по умолчанию 900 сек или 15 минут). Если событие произошло меньше, чем последние LAST_EVENT_TIME(константа из config<span></span>.py), то оно исключается из списка line_event.
 
@@ -181,16 +181,16 @@
 Далее вызывается функция `listing_events`, которая на вход принимает экземпляр класса Device. Внутри функции создается список списков словарей событий. Каждый элемент главного списка - это список, который содержит список словарей полного цикла упаковки.<br>
 Пример:<br>
 
-| Элемент главного списка(группа) | Элемент второстепенного списка(словари-события внутри группы)
--------------|-------------
- Группа  событий        |
-                        |{'time': '2020-01-01 01:00', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:02', 'object': Suitcase, 'type': 'suitcase_finish'}
-                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'}
- Группа событий         |
-                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}
-                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'}
+| Элемент главного списка(группа) | Элемент второстепенного списка(словари-события внутри группы)|
+| -------------|-----|
+| Группа  событий        |
+|                        |{'time': '2020-01-01 01:00', 'object': Suitcase, 'type': 'suitcase_start'}  |
+|                        |{'time': '2020-01-01 01:02', 'object': Suitcase, 'type': 'suitcase_finish'} |
+|                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}  |
+|                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'} |
+| Группа событий         |
+|                        |{'time': '2020-01-01 01:04', 'object': Suitcase, 'type': 'suitcase_start'}
+|                        |{'time': '2020-01-01 01:06', 'object': Suitcase, 'type': 'suitcase_finish'}
 
 
 Далее вызывается функция `check_last_event_time`, которая на вход принимает экземпляр класса Device. Внутри функции осуществляется проверка на предмет того, что события, с которыми будет продолжена дальше работа произошли раньше, чем последние LAST_EVENT_TIME(константа из config.<span></span>py. по умолчанию 900 сек или 15 минут). Если событие произошло меньше, чем последние LAST_EVENT_TIME(константа из config<span></span>.py), то оно исключается из списка line_event.
