@@ -2,8 +2,10 @@
 import os
 import logging
 import logging.handlers as handlers
+import inspect
 
 from config import DIR_NAME_LOG, FILE_NAME_LOG, FILESIZE_LOG, COUNT_BACKUP_LOG
+
 
 
 if not os.path.exists(os.path.join(os.getcwd(), DIR_NAME_LOG)):
@@ -28,5 +30,11 @@ logger.addHandler(handler)
 def create(*args):
     line = ''
     for i in args:
-        line += str(i) + ' '
+        if i != args[-1]:
+            line += str(i) + ' '
+        else:
+            line += str(i)
+    if inspect.stack()[1].function != '<module>':
+        line += "; Method " + inspect.stack()[1].function + '()'
     logger.error(line)
+
