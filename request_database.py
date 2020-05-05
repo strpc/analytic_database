@@ -1,7 +1,7 @@
+import asyncpg
+
 import asyncio
 from datetime import datetime
-
-import asyncpg
 
 import logger
 

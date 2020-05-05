@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import uvloop
+
 from datetime import timedelta, datetime
 import csv
 from time import sleep
@@ -16,6 +18,10 @@ from config import (PG_USER,
                     DEVICE_WITHOUT_RECEIPTS,
                     TIME_SLEEP
                     )
+
+
+DATE_START = '2020-01-01'
+DATE_FINISH = '2020-01-02'
 
 
 async def run_app(request: Request):
@@ -101,7 +107,7 @@ async def run_app(request: Request):
                           'обработки не были загружены. Возможно устройство '
                           'не работает. id устройства: '
                           '{0}, название: {1}'.format(
-                device.device_id, device.name))
+                              device.device_id, device.name))
 
 
 def sort_receipts(device: Device):
@@ -448,8 +454,8 @@ def receipt_broken_line_event_sync(device: Device):
                         while i >= 0 and (
                                 count_packageone > 0 or count_packagedouble > 0):
                             if count_packageone != 0 and block[i][
-                                'type'] == 'suitcase_finish' and block[i][
-                                'object'].receipt_id == '':
+                                    'type'] == 'suitcase_finish' and block[i][
+                                    'object'].receipt_id == '':
                                 block[i]['object'].receipt_id = event[
                                     'object'].receipt_id
                                 block[i]['object'].package_type_by_receipt = 1
@@ -457,8 +463,8 @@ def receipt_broken_line_event_sync(device: Device):
                                 event['object'].count_packageone -= 1
 
                             elif count_packagedouble != 0 and block[i][
-                                'type'] == 'suitcase_finish' and block[i][
-                                'object'].receipt_id == '':
+                                    'type'] == 'suitcase_finish' and block[i][
+                                    'object'].receipt_id == '':
                                 block[i]['object'].receipt_id = event[
                                     'object'].receipt_id
                                 block[i]['object'].package_type_by_receipt = 2
@@ -468,7 +474,7 @@ def receipt_broken_line_event_sync(device: Device):
 
         for event in block:
             if event['type'] == 'suitcase_finish' and event[
-                'object'].receipt_id == '':
+                    'object'].receipt_id == '':
                 event['object'].receipt_id = -1
     receipt_line_event_sync(device)
 
@@ -567,15 +573,15 @@ def receipt_line_event_sync(device: Device):
                     while len(block) > i and (
                             count_packageone > 0 or count_packagedouble > 0):
                         if count_packageone != 0 and block[i][
-                            'type'] == 'suitcase_start' and block[i][
-                            'object'].receipt_id == '':
+                                'type'] == 'suitcase_start' and block[i][
+                                'object'].receipt_id == '':
                             block[i]['object'].receipt_id = event[
                                 'object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 1
                             count_packageone -= 1
                         elif count_packagedouble != 0 and block[i][
-                            'type'] == 'suitcase_start' and block[i][
-                            'object'].receipt_id == '':
+                                'type'] == 'suitcase_start' and block[i][
+                                'object'].receipt_id == '':
                             block[i]['object'].receipt_id = event[
                                 'object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 2
@@ -584,7 +590,7 @@ def receipt_line_event_sync(device: Device):
 
         for event in block:
             if event['type'] == 'suitcase_start' and event[
-                'object'].receipt_id == '':
+                    'object'].receipt_id == '':
                 event['object'].receipt_id = -1
     adding_attributes(device)
 
@@ -611,7 +617,7 @@ def adding_attributes(device: Device):
 
                 # КПУ неоплаченная:
                 if event['object'].receipt_id == -1 and not event[
-                    'object'].issue_list and not event['object'].alarm_list:
+                        'object'].issue_list and not event['object'].alarm_list:
                     event['object'].csp = True
                     event['object'].unpaid = True
                     event['object'].to_account = True
@@ -620,14 +626,14 @@ def adding_attributes(device: Device):
 
                 # КПУ оплаченная
                 elif event['object'].receipt_id not in {-1, None} and not \
-                        event['object'].issue_list and not event[
-                    'object'].alarm_list:
+                    event['object'].issue_list and not event[
+                        'object'].alarm_list:
                     event['object'].csp = True
                     event['object'].unpaid = False
                     event['object'].to_account = True
 
                     if event['object'].package_type_by_receipt == 1 and event[
-                        'object'].package_type == 2:
+                            'object'].package_type == 2:
                         event['object'].issue_attrib['type'] = 8
                         add_template(event)
 
@@ -650,12 +656,12 @@ def adding_attributes(device: Device):
                         event['object'].to_account = True
 
                         if event['object'].package_type == 2 and event[
-                            'object'].package_type_by_receipt == 1:
+                                'object'].package_type_by_receipt == 1:
                             event['object'].issue_attrib['type'] = 8
                             add_template(event)
 
                         elif event['object'].package_type == 1 and event[
-                            'object'].package_type_by_receipt == 2:
+                                'object'].package_type_by_receipt == 2:
                             event['object'].issue_attrib['type'] = 9
                             add_template(event)
 
@@ -816,12 +822,12 @@ async def update_database(device: Device):
                 event['object'].status = 1
 
             if event['type'] == 'suitcase_start' and event[
-                'object'].alarm_list:
+                    'object'].alarm_list:
                 for alarm in event['object'].alarm_list:
                     alarm.status = 1
 
             if event['type'] == 'suitcase_start' and event[
-                'object'].issue_list:
+                    'object'].issue_list:
                 for issue in event['object'].issue_list:
                     issue.status = 1
 
@@ -935,7 +941,6 @@ def create_csv(device: Device):
                                      f"unpaid: {i['object'].unpaid}",
                                      f"to_account: {i['object'].to_account}"))
 
-
                 elif i['type'] == 'suitcase_finish':
                     writer.writerow(('', i['time'], "КОНЕЦ УПАКОВКИ"))
                     writer.writerow('')
@@ -965,7 +970,7 @@ if __name__ == '__main__':
                       date_start=DATE_START,  # dev
                       date_finish=DATE_FINISH
                       )
-
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     while True:
         # from time import time #dev
         # t1 = time()
