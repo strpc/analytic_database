@@ -92,7 +92,7 @@ async def run_app(request: Request):
                           'обработки не были загружены. Возможно устройство '
                           'не работает. id устройства: '
                           '{0}, название: {1}'.format(
-                              device.device_id, device.name))
+                device.device_id, device.name))
 
 
 def sort_receipts(device: Device):
@@ -439,8 +439,8 @@ def receipt_broken_line_event_sync(device: Device):
                         while i >= 0 and (
                                 count_packageone > 0 or count_packagedouble > 0):
                             if count_packageone != 0 and block[i][
-                                    'type'] == 'suitcase_finish' and block[i][
-                                    'object'].receipt_id == '':
+                                'type'] == 'suitcase_finish' and block[i][
+                                'object'].receipt_id == '':
                                 block[i]['object'].receipt_id = event[
                                     'object'].receipt_id
                                 block[i]['object'].package_type_by_receipt = 1
@@ -448,8 +448,8 @@ def receipt_broken_line_event_sync(device: Device):
                                 event['object'].count_packageone -= 1
 
                             elif count_packagedouble != 0 and block[i][
-                                    'type'] == 'suitcase_finish' and block[i][
-                                    'object'].receipt_id == '':
+                                'type'] == 'suitcase_finish' and block[i][
+                                'object'].receipt_id == '':
                                 block[i]['object'].receipt_id = event[
                                     'object'].receipt_id
                                 block[i]['object'].package_type_by_receipt = 2
@@ -459,7 +459,7 @@ def receipt_broken_line_event_sync(device: Device):
 
         for event in block:
             if event['type'] == 'suitcase_finish' and event[
-                    'object'].receipt_id == '':
+                'object'].receipt_id == '':
                 event['object'].receipt_id = -1
     receipt_line_event_sync(device)
 
@@ -558,15 +558,15 @@ def receipt_line_event_sync(device: Device):
                     while len(block) > i and (
                             count_packageone > 0 or count_packagedouble > 0):
                         if count_packageone != 0 and block[i][
-                                'type'] == 'suitcase_start' and block[i][
-                                'object'].receipt_id == '':
+                            'type'] == 'suitcase_start' and block[i][
+                            'object'].receipt_id == '':
                             block[i]['object'].receipt_id = event[
                                 'object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 1
                             count_packageone -= 1
                         elif count_packagedouble != 0 and block[i][
-                                'type'] == 'suitcase_start' and block[i][
-                                'object'].receipt_id == '':
+                            'type'] == 'suitcase_start' and block[i][
+                            'object'].receipt_id == '':
                             block[i]['object'].receipt_id = event[
                                 'object'].receipt_id
                             block[i]['object'].package_type_by_receipt = 2
@@ -575,7 +575,7 @@ def receipt_line_event_sync(device: Device):
 
         for event in block:
             if event['type'] == 'suitcase_start' and event[
-                    'object'].receipt_id == '':
+                'object'].receipt_id == '':
                 event['object'].receipt_id = -1
     adding_attributes(device)
 
@@ -602,7 +602,7 @@ def adding_attributes(device: Device):
 
                 # КПУ неоплаченная:
                 if event['object'].receipt_id == -1 and not event[
-                        'object'].issue_list and not event['object'].alarm_list:
+                    'object'].issue_list and not event['object'].alarm_list:
                     event['object'].csp = True
                     event['object'].unpaid = True
                     event['object'].to_account = True
@@ -611,14 +611,14 @@ def adding_attributes(device: Device):
 
                 # КПУ оплаченная
                 elif event['object'].receipt_id not in {-1, None} and not \
-                    event['object'].issue_list and not event[
-                        'object'].alarm_list:
+                        event['object'].issue_list and not event[
+                    'object'].alarm_list:
                     event['object'].csp = True
                     event['object'].unpaid = False
                     event['object'].to_account = True
 
                     if event['object'].package_type_by_receipt == 1 and event[
-                            'object'].package_type == 2:
+                        'object'].package_type == 2:
                         event['object'].issue_attrib['type'] = 8
                         add_template(event)
 
@@ -641,12 +641,12 @@ def adding_attributes(device: Device):
                         event['object'].to_account = True
 
                         if event['object'].package_type == 2 and event[
-                                'object'].package_type_by_receipt == 1:
+                            'object'].package_type_by_receipt == 1:
                             event['object'].issue_attrib['type'] = 8
                             add_template(event)
 
                         elif event['object'].package_type == 1 and event[
-                                'object'].package_type_by_receipt == 2:
+                            'object'].package_type_by_receipt == 2:
                             event['object'].issue_attrib['type'] = 9
                             add_template(event)
 
@@ -687,7 +687,8 @@ async def update_database(device: Device):
         while len(block) > i:
             if block[i]['type'] == 'suitcase_start' and \
                     block[i]['object'].issue_attrib.get('type') in {7, 8, 9}:
-                await device.request.create_polycommissue_event(block[i]['object'])
+                await device.request.create_polycommissue_event(
+                    block[i]['object'])
             if block[i]['type'] == 'suitcase_start':
                 block[i]['object'].status = 1
 
@@ -748,7 +749,8 @@ async def update_database(device: Device):
                         to_task_event['event_id'] = alarm.polycommalarm_id
                         to_task_event['table_name'] = 'polycommalarm'
                         to_task_event['ord'] += 1
-                        await device.request.create_task_to_event(to_task_event)
+                        await device.request.create_task_to_event(
+                            to_task_event)
                         await device.request.update_status(event=alarm)
                         print('\n\nalarm in suitcase\n\n')
 
@@ -758,7 +760,8 @@ async def update_database(device: Device):
                         to_task_event['event_id'] = issue.polycommissue_id
                         to_task_event['table_name'] = 'polycommissue'
                         to_task_event['ord'] += 1
-                        await device.request.create_task_to_event(to_task_event)
+                        await device.request.create_task_to_event(
+                            to_task_event)
                         await device.request.update_status(event=issue)
                         print('\n\nissue in suitcase\n\n')
 
@@ -782,7 +785,8 @@ async def update_database(device: Device):
                 await device.request.create_task_to_event(to_task_event)
             await device.request.update_status(event=event)
         if to_task_event['task_id']:
-            await device.request.update_status(task_id=to_task_event['task_id'])
+            await device.request.update_status(
+                task_id=to_task_event['task_id'])
 
     # line event:
     for block in device.line_event:
@@ -807,12 +811,12 @@ async def update_database(device: Device):
                 event['object'].status = 1
 
             if event['type'] == 'suitcase_start' and event[
-                    'object'].alarm_list:
+                'object'].alarm_list:
                 for alarm in event['object'].alarm_list:
                     alarm.status = 1
 
             if event['type'] == 'suitcase_start' and event[
-                    'object'].issue_list:
+                'object'].issue_list:
                 for issue in event['object'].issue_list:
                     issue.status = 1
 
@@ -847,7 +851,8 @@ async def update_database(device: Device):
                         to_task_event['event_id'] = alarm.polycommalarm_id
                         to_task_event['table_name'] = 'polycommalarm'
                         to_task_event['ord'] += 1
-                        await device.request.create_task_to_event(to_task_event)
+                        await device.request.create_task_to_event(
+                            to_task_event)
                         await device.request.update_status(event=alarm)
                         print('alarm in suitcase line event')
 
@@ -857,7 +862,8 @@ async def update_database(device: Device):
                         to_task_event['event_id'] = issue.polycommissue_id
                         to_task_event['table_name'] = 'polycommissue'
                         to_task_event['ord'] += 1
-                        await device.request.create_task_to_event(to_task_event)
+                        await device.request.create_task_to_event(
+                            to_task_event)
                         await device.request.update_status(event=issue)
                         print('issue in suitcase line_event')
 
