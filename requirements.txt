@@ -1,1 +1,2 @@
 asyncpg==0.20.1
+uvloop==0.14.0

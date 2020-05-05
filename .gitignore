@@ -1,0 +1,15 @@
+.DS_Store
+**/venv/*
+**/.idea/*
+**/.vscode/*
+**/__pycache__/*
+*.csv
+*.txt
+*.html
+*.log
+*.zip
+*.pyc
+test.py
+wiki.md
+todo.md
+!requirements.txt

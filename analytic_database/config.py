@@ -2,10 +2,10 @@
 DEVICE_WITHOUT_RECEIPTS = True
 
 # Database settings:
-PG_USER = ''
-PG_PASSWORD = ''
-PG_HOST = ''
-PG_DB = ''
+PG_USER = 'postgres'
+PG_PASSWORD = '1'
+PG_HOST = 'localhost'
+PG_DB = 'base_full'
 
 # Timesettings:
 LAST_EVENT_TIME = 900
